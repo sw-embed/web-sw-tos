@@ -1,4 +1,4 @@
-number = 9
+number = 10
 slug = "deploy-shell-demo"
 status = "pending"
 description = "Build pages/ and verify the live Shell-only demo end to end."

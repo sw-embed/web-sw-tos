@@ -1,4 +1,4 @@
-number = 5
+number = 6
 slug = "virtual-uart"
 status = "pending"
 description = "In-process byte-queue transport replacing the pty, joining the frontend decoder to the emulator pump."

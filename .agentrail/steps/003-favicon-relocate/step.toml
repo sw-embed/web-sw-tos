@@ -1,0 +1,9 @@
+number = 3
+slug = "favicon-relocate"
+status = "in-progress"
+description = "Relocate the desktop-icon favicon.ico out of the repo root and make the live ..."
+role = "production"
+context_files = []
+created_at = "2026-08-28T09:49:44"
+task_type = "feature"
+commits = []
