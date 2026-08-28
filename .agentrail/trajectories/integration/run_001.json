@@ -1,0 +1,11 @@
+{
+  "task_type": "integration",
+  "state": {
+    "number": 14,
+    "step": "negotiate-transport"
+  },
+  "action": "Verified negotiation natively rather than in the browser since a protocol failure is faster to diagnose there; read the PL/SW shell source to find the literal byte-10 terminator after framed help still returned BAD; pinned the CR/LF requirement with a test that asserts CR still yields BAD, since a regression would otherwise be invisible.",
+  "result": "success",
+  "reward": 1,
+  "timestamp": "2026-08-28T13:54:31"
+}
