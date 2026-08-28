@@ -1,7 +1,7 @@
 number = 13
-slug = "copy-mode-scrollback"
+slug = "zoom-and-focus"
 status = "pending"
-description = "Ctrl-A y, arrows/hjkl, PgUp/PgDn, g/G, q."
+description = "Ctrl-A 1-9, n, s, x, a, z."
 role = "legacy"
 context_files = []
 created_at = "2026-08-28T09:20:27"

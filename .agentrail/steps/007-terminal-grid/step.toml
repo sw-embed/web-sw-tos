@@ -1,4 +1,4 @@
-number = 6
+number = 7
 slug = "terminal-grid"
 status = "pending"
 description = "Fixed-size character grid with selectable 80x24 / 120x43 geometry."

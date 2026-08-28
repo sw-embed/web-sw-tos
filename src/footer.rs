@@ -7,7 +7,7 @@ const REPOSITORY: &str = "https://github.com/sw-embed/web-sw-tos";
 pub fn footer() -> Html {
     html! {
         <footer>
-            <span>{ "Copyright (c) 2026 Michael A. Wright" }</span>
+            <span>{ "Copyright (c) 2026 Michael A Wright" }</span>
             { separator() }
             <span>{ "MIT License" }</span>
             { separator() }

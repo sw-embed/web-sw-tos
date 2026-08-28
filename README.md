@@ -1,40 +1,67 @@
-# web-sw-tos
+# SWTOS -- Live Terminal Demo
 
-Browser live demo of the [SWTOS](https://github.com/sw-embed/sw-tos)
-terminal: a preemptively multitasking microkernel running on an emulated
-[COR24](https://github.com/sw-embed/sw-cor24-emulator) CPU, driven from a
-tiled terminal frontend, entirely client-side via WebAssembly.
+A preemptively multitasking microkernel running on an emulated 24-bit RISC
+CPU, driven from a tiled terminal frontend, entirely inside your browser.
+Rust compiled to WebAssembly, with no server and nothing to install.
 
-**Live demo:** <https://sw-embed.github.io/web-sw-tos/>
+**[Live Demo](https://sw-embed.github.io/web-sw-tos/)**
+
+![SWTOS running in the browser](images/screenshot.png?ts=1787935381000)
 
 Part of the [Software Wrighter COR24 Tools Project](https://sw-embed.github.io/web-sw-cor24-demos/#/).
 
-## What this is
+## Introduction
 
-The SWTOS command-line demo is three pieces joined by a pty: a host that runs
-the COR24 emulator, the pty itself, and `te-rs`, the tiled terminal frontend.
-In the browser all three collapse into a single WebAssembly module and the pty
-becomes an in-process virtual UART. Everything else keeps its shape, including
-the framed transport and the host-driven scheduler heartbeat that makes
-preemption work.
+[SWTOS](https://github.com/sw-embed/sw-tos) is a clean-room microkernel for
+small CPUs, inspired by MINIX IPC principles. It runs on the MakerLisp COR24
+soft CPU -- a 24-bit RISC core for Lattice FPGAs -- and provides synchronous
+message-passing IPC, a resident program catalog, and preemptive scheduling
+without an MMU, without hardware multiply, and without floating point.
 
-The result is a simulated CLI in a web page: a fixed-size character grid that
-the SWTOS frontend divides into panes, driven entirely by `Ctrl-A` commands
-exactly as on a real terminal.
+Its command-line demo is three programs joined by a pty: a host process
+running the COR24 emulator, the pty itself, and `te-rs`, a tiled terminal
+frontend that keeps the shell, applications, a debugger, and a resource
+monitor in independent panes.
+
+This project collapses all three into a single WebAssembly module. The pty
+becomes an in-process virtual UART, and everything else keeps its shape --
+the same framed transport, the same pane model, and the same host-driven
+scheduler heartbeat that makes preemption work. The result is a simulated
+CLI in a web page: one fixed-size character grid that the frontend divides
+into panes, driven entirely by `Ctrl-A` commands exactly as on a real
+terminal.
+
+There is deliberately no mouse support, no scrollbars, and no copy/paste.
+The demo reproduces a terminal, so layout, focus, zoom, and scrolling belong
+to the frontend rather than to the browser.
+
+### Why it is interesting
+
+The headline is preemption. The `cpu-hog` program in the SWTOS catalog
+contains no yield, no syscall, no I/O, no IPC, no sleep, and no blocking
+operation of any kind. Two copies of it can run at once while the shell
+stays interactive and the resource monitor keeps updating -- because the
+scheduler is driven by a timer heartbeat the host sends over the UART, and
+the kernel preempts a running process from the interrupt context.
+
+Watching that work in a browser tab, against a real emulated CPU rather than
+a simulation of one, is the point of this demo.
 
 ## Status
 
-Under construction. See [docs/plan.md](docs/plan.md) for the phase order.
+Under construction. The scaffold is in place and the character grid renders;
+the emulator, virtual UART, and panes are not wired up yet.
 
-- **Phase 0** -- foundation: scaffold, vendored image, vendored frontend core
-- **Phase 1** -- an interactive Shell pane over the virtual UART
-- **Phase 2** -- application, resources, and debugger panes, zoom, copy-mode
-  scrollback, and the preemption proof
+| Phase | Scope | State |
+|---|---|---|
+| 0 | Foundation: scaffold, vendored image, vendored frontend core | in progress |
+| 1 | An interactive Shell pane over the virtual UART | planned |
+| 2 | Application, resources, and debugger panes; zoom; copy mode; the preemption proof | planned |
 
-## Usage (once Phase 1 lands)
+## Usage
 
-The frontend prefix is `Ctrl-A`. Release it before typing the command; each
-command needs its own prefix.
+Once Phase 1 lands, the frontend prefix is `Ctrl-A`. Release it before typing
+the command; each command needs its own prefix.
 
 | Prefix command | Action |
 |---|---|
@@ -46,17 +73,50 @@ command needs its own prefix.
 | `y` | Enter or leave copy mode |
 | `?` | Toggle help |
 
-In copy mode, navigate with the arrow keys or `hjkl`, page with `PgUp`/`PgDn`,
-jump with `g`/`G`, and leave with `q`.
+In copy mode, navigate with the arrow keys or `hjkl`, page with `PgUp` and
+`PgDn`, jump to either end with `g` and `G`, and leave with `q`.
 
-There is deliberately no mouse support, no scrollbars, and no copy/paste. The
-demo reproduces a terminal, and layout, focus, zoom, and scrolling all belong
-to the frontend rather than to the browser.
+## Documentation
 
-## Build
+- [docs/plan.md](docs/plan.md) -- architecture, the decisions behind it, the
+  vendored-module triage, known hazards, and the phase order
+- [docs/architecture.md](docs/architecture.md) -- the workspace and module
+  tree, dependency direction, and what is vendored from where
 
-Requires [Trunk](https://trunkrs.dev/) and a Rust toolchain with the
-`wasm32-unknown-unknown` target.
+Upstream reference material:
+
+- [SWTOS protocol](https://github.com/sw-embed/sw-tos/blob/main/docs/protocol.md)
+  -- the framed multiplexed transport this demo speaks
+- [SWTOS preemptive multitasking](https://github.com/sw-embed/sw-tos/blob/main/docs/preemptive-multitasking.md)
+  -- the UART-clock scheduling design
+- [SWTOS windows frontend](https://github.com/sw-embed/sw-tos/blob/main/docs/windows-usage.md)
+  -- the tiled frontend this demo ports
+
+## Development
+
+### Requirements
+
+- A Rust toolchain with the `wasm32-unknown-unknown` target
+- [Trunk](https://trunkrs.dev/)
+- These sibling repositories checked out beside this one:
+
+| Repo | Role |
+|---|---|
+| [`sw-tos`](https://github.com/sw-embed/sw-tos) | Reference implementation, and the source of the vendored frontend and system image |
+| [`sw-cor24-emulator`](https://github.com/sw-embed/sw-cor24-emulator) | `EmulatorCore`, a path dependency |
+| [`sw-cor24-isa`](https://github.com/sw-embed/sw-cor24-isa) | COR24 ISA definitions |
+
+```bash
+git clone git@github.com:sw-embed/sw-cor24-emulator.git
+git clone git@github.com:sw-embed/sw-cor24-isa.git
+rustup target add wasm32-unknown-unknown
+```
+
+`sw-tos` is never modified by this project. The `te-rs` frontend modules and
+the prebuilt system image are vendored copies living here, free to diverge;
+re-vendoring is how this repo tracks upstream.
+
+### Build and run
 
 ```bash
 trunk build                # dev build to dist/
@@ -64,7 +124,7 @@ trunk build                # dev build to dist/
 ./scripts/build-pages.sh   # release build to pages/ for GitHub Pages
 ```
 
-Quality gates:
+### Quality gates
 
 ```bash
 cargo clippy --all-targets --all-features -- -D warnings
@@ -72,44 +132,37 @@ cargo fmt --all -- --check
 sw-checklist
 ```
 
-The Pages workflow deploys the **committed** `pages/` directory, so run
-`build-pages.sh` and stage `pages/` whenever web source changes.
+Clippy runs clean with zero warnings; warnings are fixed, never suppressed.
+`sw-checklist` is expected to stay at 16 passed, 0 failed, 0 warnings.
 
-## Sibling repositories
+### Deployment
 
-This project expects these as siblings under the same parent directory:
+The Pages workflow deploys the **committed** `pages/` directory rather than
+building in CI, so the WebAssembly bundle is built locally and checked in.
+Run `./scripts/build-pages.sh` and stage `pages/` whenever web source
+changes.
 
-| Repo | Role |
-|---|---|
-| [`sw-tos`](https://github.com/sw-embed/sw-tos) | Reference implementation and the source of the vendored frontend and image |
-| [`sw-cor24-emulator`](https://github.com/sw-embed/sw-cor24-emulator) | `EmulatorCore` (path dependency) |
-| [`sw-cor24-isa`](https://github.com/sw-embed/sw-cor24-isa) | COR24 ISA definitions |
+### Project layout
 
-`sw-tos` is never modified by this project. The `te-rs` frontend modules and
-the prebuilt SWTOS image are vendored copies living here.
-
-## Technology
-
-| Component | Choice |
-|---|---|
-| Language | Rust (edition 2024) |
-| UI framework | Yew 0.21 (CSR) |
-| Build tool | Trunk |
-| WASM bindings | wasm-bindgen + web-sys |
-| Theme | Catppuccin Mocha |
-| Emulator | cor24-emulator (path dependency) |
-| Frontend | te-rs core, vendored from sw-tos |
+```
+src/            Yew application
+crates/         swtos-frontend (vendored te-rs core), swtos-host (emulator side)
+assets/         vendored SWTOS image and debug map
+docs/           design documents
+images/         README assets
+pages/          committed GitHub Pages output
+scripts/        serve.sh, build-pages.sh
+```
 
 ## Links
 
 - Blog: [Software Wrighter Lab](https://software-wrighter-lab.github.io/)
 - Discord: [Join the community](https://discord.com/invite/Ctzk5uHggZ)
 - YouTube: [Software Wrighter](https://www.youtube.com/@SoftwareWrighter)
-
-## Copyright
-
-Copyright (c) 2026 Michael A. Wright
+- Hardware: [MakerLisp COR24 Test Board](https://www.makerlisp.com/cor24-test-board)
 
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE)
+
+Copyright (c) 2026 Michael A Wright
