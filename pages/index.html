@@ -7,8 +7,8 @@
     <link rel="icon" href="/web-sw-tos/favicon-bcf144d5b6f95c6d.ico" integrity="sha384-q14nRLPczzRgE8/zaImxLh2AXA8uRRiDIyWyuJhBLDExklCa6ZcQ9ZdgZh27xK6B"/>
     
 <script type="module">
-import init, * as bindings from '/web-sw-tos/web-sw-tos-ca497964297c3c89.js';
-const wasm = await init({ module_or_path: '/web-sw-tos/web-sw-tos-ca497964297c3c89_bg.wasm' });
+import init, * as bindings from '/web-sw-tos/web-sw-tos-cd4dd5024acc3969.js';
+const wasm = await init({ module_or_path: '/web-sw-tos/web-sw-tos-cd4dd5024acc3969_bg.wasm' });
 
 
 window.wasmBindings = bindings;
@@ -59,7 +59,7 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
         }
         #app { flex: 1; display: flex; flex-direction: column; min-height: 0; }
     </style>
-<link rel="modulepreload" href="/web-sw-tos/web-sw-tos-ca497964297c3c89.js" crossorigin="anonymous" integrity="sha384-S1J4l68v1ofsS7NthGjz2R0zfhee/nQIIUeWJV1DimKsG56IFaC8s2U71KcH0iuM"><link rel="preload" href="/web-sw-tos/web-sw-tos-ca497964297c3c89_bg.wasm" crossorigin="anonymous" integrity="sha384-62X9XpA1aQlAukpdpGQAyEvxB+CcSmAX6lb2ByaaZDx2GmyXQr868NhnuEZtknMB" as="fetch" type="application/wasm"></head>
+<link rel="modulepreload" href="/web-sw-tos/web-sw-tos-cd4dd5024acc3969.js" crossorigin="anonymous" integrity="sha384-l19+krXomv4lKgSuU7QHbaLu6/rd/qrIj/54cgS+P/UpC6SzpIUCJSXg4RGpuG4Z"><link rel="preload" href="/web-sw-tos/web-sw-tos-cd4dd5024acc3969_bg.wasm" crossorigin="anonymous" integrity="sha384-Gnun05vRMqDJD7rBLNuSTqlhAXH7oRPF7rcDdq3p268qW0gzQFTQfNWFMS9Yu+7W" as="fetch" type="application/wasm"></head>
 <body>
     <div id="app"></div>
 </body>
