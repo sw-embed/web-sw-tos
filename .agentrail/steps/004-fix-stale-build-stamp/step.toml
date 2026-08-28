@@ -1,0 +1,12 @@
+number = 4
+slug = "fix-stale-build-stamp"
+status = "in-progress"
+description = """
+Fix the frozen build provenance in the footer.
+
+Defect: build.rs emits only '..."""
+role = "production"
+context_files = []
+created_at = "2026-08-28T10:00:03"
+task_type = "bug-fix"
+commits = []

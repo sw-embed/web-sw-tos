@@ -1,4 +1,4 @@
-number = 9
+number = 10
 slug = "keyboard-input"
 status = "pending"
 description = "Key capture to framed TTY_INPUT, Ctrl-A prefix interception with preventDefault, Escape and backspace."
