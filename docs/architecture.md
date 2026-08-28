@@ -101,6 +101,34 @@ vendored module is ever rewritten rather than copied, it loses the exception.
 Commits that add or refresh vendored code carry a `sw-checklist: exception`
 trailer naming the files and the reason.
 
+## Vendored patch inventory
+
+Every local change to a vendored file, so re-vendoring is mechanical rather
+than archaeological. Re-vendor by copying upstream fresh, then walking this
+table: **required** patches must be re-applied, **clippy** patches should be
+checked first and dropped if upstream has since fixed them.
+
+`sw-tos` has been asked to run clippy on `te-rs`, so the clippy rows below are
+expected to become redundant. When they do, take upstream's fix and delete the
+row -- do not preserve a local patch just because it exists. Upstream may well
+resolve these differently (`draw_box` in particular), and upstream's shape wins
+on anything cosmetic.
+
+| File | Kind | Change |
+|---|---|---|
+| `resource.rs` | required | `Instant` -> `Millis` (`f64`), caller-supplied. `Instant::now()` panics on wasm32. |
+| `debug.rs` | required | `load(path)` -> `from_json(contents)`. No filesystem in a browser. |
+| `ui.rs` | required | Renders `Vec<Vec<Cell>>` via `render_grid`, not an ANSI `String`. Body is height-1 rows. Adds `Cell`, `Color`, `Attrs`, `status_row`. |
+| `ui.rs` | test | Test helper flattens the grid to text so upstream assertions run unchanged. |
+| `debug.rs` | clippy | Collapsed a nested `if` into the `let`-chain above it. |
+| `ui.rs` | clippy | `draw_box` geometry bundled into `Rect` (was 9 arguments). |
+| `ui.rs` | clippy | Box edges drawn via `horizontal_edge` and row iteration, not range indexing. |
+| all four | trace | Provenance header naming source repo, path, commit, and date. |
+
+The required rows are not negotiable and will survive any upstream change:
+they exist because a browser has no filesystem, no `Instant`, and no terminal
+to emit escapes at.
+
 ## What is vendored, and from where
 
 `../sw-tos` is read-only reference material and is never modified. The `te-rs`
