@@ -64,29 +64,42 @@ into the frontend decoder, and bytes out of the frontend go into the pump.
 That is the same shape as the CLI, where the two processes share nothing but
 the byte stream.
 
-## Vendored code and sw-checklist
+## Vendored code: what is excepted, and what is not
 
-`sw-checklist` limits apply to code this project owns. They are relaxed for
-files under `crates/swtos-frontend/src/` that are faithful copies of `te-rs`.
+The two quality gates are treated differently, because they fail for different
+reasons.
 
-`protocol.rs` fails Module Function Count with 25 functions against a maximum
-of 7, and warns on file length and two `push` implementations. Those limits
-could be satisfied by splitting the module into `frame` / `decoder` /
-`negotiation` submodules, and that is deliberately not done: the value of
-vendoring is that re-syncing with upstream is a copy plus a header, and a
-structural refactor turns every future re-vendor into a manual merge. Moving
-the tests out does not help either -- it clears the file-length warning but
-still leaves 18 functions.
+**Clippy is fixed, never suppressed -- vendored files included.** Every clippy
+finding in vendored code so far has been a small, local, mechanical fix that
+survives re-vendoring as a short patch: collapsing a nested `if`, bundling four
+positional arguments into a `Rect`, iterating a row instead of indexing it by
+range. None required understanding the module as a whole. There is no
+`#[allow]` anywhere in this repo, and there should not be one.
 
-So the trade is a permanent, well-understood exception on a small number of
-copied files, versus permanent merge friction on every update to the
-reference implementation. The exception is the cheaper side.
+**`sw-checklist`'s structural limits are excepted for vendored files.** These
+are the limits on functions per module, lines per function, and lines per file.
+Satisfying them means splitting modules and reshaping functions, which forks
+the file from upstream and turns every future re-vendor into a manual merge
+rather than a copy plus a header. That is a permanent cost paid on every
+update, against a bounded and well-understood one-time exception.
 
-The rule this sets: **a vendored file carries an exception; a file we author
-does not.** If a vendored module is ever rewritten rather than copied, it
-loses the exception and must meet the limits like anything else. Commits that
-add or refresh vendored code carry a `sw-checklist: exception` trailer naming
-the file and the reason.
+Current standing exception, all of it `crates/swtos-frontend/src/`:
+
+| Module | Why it fails |
+|---|---|
+| `protocol.rs` | 25 functions, 445 lines |
+| `ui.rs` | 50 functions, 730 lines |
+| `debug.rs` | 31 functions, 567 lines |
+| `resource.rs` | 8 functions, one 69-line `push` |
+
+The crate itself also warns at 5 modules against a limit of 4.
+
+The rule this sets: **a vendored file carries the structural exception; a file
+we author does not.** Warnings introduced in `src/` or `crates/swtos-host/`
+have been fixed each time they appeared rather than allowed to accumulate. If a
+vendored module is ever rewritten rather than copied, it loses the exception.
+Commits that add or refresh vendored code carry a `sw-checklist: exception`
+trailer naming the files and the reason.
 
 ## What is vendored, and from where
 
