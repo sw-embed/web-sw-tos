@@ -1,43 +1,50 @@
-mod footer;
+mod chrome;
 pub mod session;
 
 use gloo::events::EventListener;
-use gloo::timers::callback::Interval;
+use gloo::timers::callback::Timeout;
 use js_sys::Date;
 use session::Session;
 use wasm_bindgen::JsCast;
+use web_sys::HtmlSelectElement;
 use yew::prelude::*;
-
-/// Grid geometry. Step 010 makes this selectable (80x24 / 120x43).
-pub const COLS: usize = 80;
-pub const ROWS: usize = 24;
 
 /// SWTOS expects its scheduler heartbeat at 100 Hz.
 const TICK_MS: f64 = 10.0;
 
-/// How often the browser is asked to run us. A hidden tab is throttled to
-/// roughly 1 Hz whatever we request, which is exactly why the work per
-/// callback is derived from the wall clock rather than assumed.
-const INTERVAL_MS: u32 = 10;
+/// Wall-clock ceiling on one callback. Work is bounded by time rather than by
+/// tick count because a tick's cost is not fixed, and because the browser has
+/// to get the thread back on a predictable schedule whatever the emulator is
+/// doing.
+const BUDGET_MS: f64 = 50.0;
 
-/// Ceiling on catch-up. A hidden tab is throttled to about 1 Hz, so without a
-/// cap each callback would try to execute a full second of missed ticks in
-/// one blocking burst and freeze the UI on return. The deliberate trade is
-/// that a backgrounded tab lets emulated time fall behind the wall clock
-/// rather than stuttering: at roughly 17 ms per tick this bounds one burst to
-/// about a third of a second.
+/// Ceiling on ticks per callback. A hidden tab is throttled to roughly 1 Hz
+/// however the next tick is scheduled, so without catch-up an unfocused demo
+/// would advance one tick per second. With it, a throttled tab runs what fits
+/// the budget and lets emulated time fall behind rather than stealing the
+/// thread -- which is the right trade for a tab nobody is looking at.
 const MAX_CATCHUP: u32 = 20;
 
 pub enum Msg {
     Tick,
     Key(String, bool),
+    Geometry(usize),
 }
 
 pub struct App {
     session: Session,
+    geometry: usize,
     last: f64,
     ms_per_tick: f64,
-    _ticker: Interval,
+    /// The next tick, re-armed after each one completes.
+    ///
+    /// Deliberately not an `Interval`. A repeating timer keeps firing whether
+    /// or not the previous callback has finished, and since one tick takes
+    /// longer than the interval asks for, callbacks queue faster than they
+    /// drain and the main thread never yields again. Self-rescheduling keeps
+    /// exactly one callback outstanding, so the emulator runs as fast as it
+    /// can without ever starving the page.
+    next: Option<Timeout>,
     _keys: EventListener,
 }
 
@@ -65,58 +72,70 @@ impl Component for App {
         });
         Self {
             session: Session::default(),
+            geometry: 0,
             last: Date::now(),
             ms_per_tick: 0.0,
-            _ticker: Interval::new(INTERVAL_MS, move || link.send_message(Msg::Tick)),
+            next: Some(Timeout::new(0, move || link.send_message(Msg::Tick))),
             _keys: listener,
         }
     }
 
-    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::Tick => {
-                let now = Date::now();
-                let owed = (((now - self.last) / TICK_MS) as u32).clamp(1, MAX_CATCHUP);
                 let started = Date::now();
-                self.session.step_many(owed);
-                self.ms_per_tick = (Date::now() - started) / f64::from(owed);
-                self.last = now;
+                let owed = (((started - self.last) / TICK_MS) as u32).clamp(1, MAX_CATCHUP);
+                self.ms_per_tick = self.session.run_until(owed, started + BUDGET_MS);
+                self.last = started;
+                // Aim for the 100 Hz cadence, but never schedule zero delay:
+                // the browser has to get a turn between ticks.
+                let delay = (TICK_MS - (Date::now() - started)).max(1.0) as u32;
+                let link = ctx.link().clone();
+                self.next = Some(Timeout::new(delay, move || link.send_message(Msg::Tick)));
             }
             Msg::Key(key, ctrl) => {
                 self.session.send_key(&key, ctrl);
             }
+            Msg::Geometry(index) => self.geometry = index.min(chrome::GEOMETRIES.len() - 1),
         }
         true
     }
 
-    fn view(&self, _ctx: &Context<Self>) -> Html {
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let (cols, rows) = chrome::GEOMETRIES[self.geometry];
+        let (tick, log_entries) = self.session.stats();
+        let on_geometry = ctx.link().callback(|event: Event| {
+            let select: HtmlSelectElement = event.target_unchecked_into();
+            Msg::Geometry(select.selected_index().max(0) as usize)
+        });
         html! {
             <>
-                <header>
-                    <h1>{ "SWTOS" }</h1>
-                    <span class="tagline">
-                        { "preemptive multitasking on an emulated COR24, in your browser" }
-                    </span>
-                </header>
+                { chrome::header(self.geometry, on_geometry) }
                 <div class="stage">
-                    <pre class="terminal" style={format!("--cols: {COLS}; --rows: {ROWS};")}
-                         tabindex="0">{ self.screen() }</pre>
+                    <pre class="terminal" style={format!("--cols: {cols}; --rows: {rows};")}>
+                        { self.screen(cols, rows) }
+                    </pre>
                 </div>
-                { footer::footer() }
+                <div class="diagnostics">
+                    { format!("tick {tick}  {:.3} ms/tick  budget {TICK_MS} ms  \
+                               uart-log {log_entries} entries", self.ms_per_tick) }
+                </div>
+                { chrome::footer() }
             </>
         }
     }
 }
 
 impl App {
-    /// The target's output plus a diagnostic line. Step 010 replaces this
-    /// with the vendored pane model's cell grid.
-    fn screen(&self) -> String {
-        let (tick, log_entries) = self.session.stats();
-        format!(
-            "tick {tick}  {:.3} ms/tick  budget {TICK_MS} ms  uart-log {log_entries}\n{}",
-            self.ms_per_tick,
-            self.session.text()
-        )
+    /// Flatten the pane grid into text for the `<pre>`. Cells carry colour and
+    /// attributes that nothing sets yet; when they do, this is the one place
+    /// that has to start emitting spans.
+    fn screen(&self, cols: usize, rows: usize) -> String {
+        self.session
+            .grid(cols, rows)
+            .into_iter()
+            .map(|row| row.into_iter().map(|cell| cell.ch).collect::<String>())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }

@@ -1,6 +1,6 @@
 number = 12
 slug = "terminal-grid"
-status = "pending"
+status = "in-progress"
 description = "Fixed-size character grid with selectable 80x24 / 120x43 geometry."
 role = "legacy"
 context_files = []

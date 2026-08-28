@@ -45,13 +45,39 @@ fn named_keys_send_nothing() {
     assert!(session.send_key("1", true).is_empty(), "Ctrl-digit leaked");
 }
 
-/// The target never echoes, so the frontend does. Enter shows as a newline
-/// and backspace erases, or typing looks broken while working perfectly.
+/// The target never echoes, so the frontend does. Checked against the
+/// rendered grid rather than an internal buffer, because what matters is that
+/// typing reaches the visible screen: backspace must erase, and Enter must
+/// commit the line rather than restart it the way a pane treats a bare CR.
 #[test]
-fn typing_is_echoed_locally() {
+fn typing_is_echoed_onto_the_screen() {
     let mut session = Session::default();
     for key in ["h", "i", "x", "Backspace", "Enter"] {
         session.send_key(key, false);
     }
-    assert!(session.text().ends_with("hi\n"), "got {:?}", session.text());
+    let screen = rendered(&session);
+    assert!(
+        screen.contains("hi"),
+        "typing never reached the screen: {screen}"
+    );
+    assert!(!screen.contains("hix"), "backspace did not erase: {screen}");
+}
+
+/// A key the mapping ignores must not reach the screen either.
+#[test]
+fn ignored_keys_leave_no_trace() {
+    let mut session = Session::default();
+    session.send_key("ArrowUp", false);
+    session.send_key("Shift", false);
+    assert!(!rendered(&session).contains("Arrow"));
+    assert!(!rendered(&session).contains("Shift"));
+}
+
+fn rendered(session: &Session) -> String {
+    session
+        .grid(80, 24)
+        .into_iter()
+        .map(|row| row.into_iter().map(|cell| cell.ch).collect::<String>())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
