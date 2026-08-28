@@ -116,6 +116,42 @@ CPU run on beyond heartbeat pacing; shrinking it trades emulated CPU speed for
 a more accurate clock. Not tuned yet -- 60 Hz is good enough to build on, and
 tuning against a hidden-tab measurement would be tuning against noise.
 
+## Pane lifecycle, and a deliberate divergence from te-rs
+
+How `te-rs` behaves today, read from `ui.rs` and the frame dispatch in
+`main.rs`:
+
+| Frame | Effect |
+|---|---|
+| `ChannelOpen` (3) | `add_application`. If a pane already holds that channel it is **reused and retitled**, but its scrollback is **not** cleared. |
+| `ChannelTitle` (5) | Retitles the pane at any time, whenever the target sends it. |
+| `ChannelClose` (4) | `release_channel` **removes the application pane outright**. Shell, Debugger, and Resources panes are retained regardless. |
+
+So today: a pane cannot be cleared at all -- there is no clear command in the
+Ctrl-A set, and the only way to discard output is `Ctrl-A x` to close the pane
+entirely. Titles change on open and on any `ChannelTitle` frame. Nothing is
+ever flagged as ended, because an ended application's pane has already
+disappeared.
+
+Two of those are worth changing here, and this repo is free to: the vendored
+copy may diverge, provided the divergence is deliberate and written down.
+
+**An ended application keeps its pane, flagged.** Removing the pane on
+`ChannelClose` destroys the program's final output at the exact moment the
+output becomes worth reading. The pane stays, its title gains an ` (ended)`
+suffix, and it stops accepting input. `Ctrl-A x` still closes it. This also
+answers the stale-output question directly: output after an app ends is not
+stale, it is the result, and it should persist until dismissed.
+
+**Reuse clears; an explicit clear exists.** When a channel is reused for a new
+application the pane is cleared first, so one program's output can never be
+mistaken for the next one's. Separately, `Ctrl-A c` clears the focused pane on
+demand -- scrollback, the partial line, and the scroll offset.
+
+Both belong to the application-panes step. Recording them here because the
+choice is not obvious from the reference implementation, and a later reader
+comparing the two frontends should find the reason rather than assume drift.
+
 ## Known hazards
 
 - `UartLog` is an unbounded `Vec` with only `clear()`. The CLI adapter's

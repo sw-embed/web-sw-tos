@@ -1,0 +1,9 @@
+number = 13
+slug = "pane-lifecycle"
+status = "pending"
+description = "Implement the pane lifecycle decisions recorded in docs/plan.md under 'Pane l..."
+role = "production"
+context_files = []
+created_at = "2026-08-28T12:51:46"
+task_type = "feature"
+commits = []
