@@ -1,8 +1,9 @@
 number = 7
 slug = "virtual-uart"
-status = "in-progress"
+status = "completed"
 description = "In-process byte-queue transport replacing the pty, joining the frontend decoder to the emulator pump."
 role = "legacy"
 context_files = []
 created_at = "2026-08-28T09:20:27"
-commits = []
+completed_at = "2026-08-28T12:19:10"
+commits = ["cce3c551a54c2e793e9eb5815dd7f8e8eefbfbad"]
