@@ -1,8 +1,9 @@
 number = 5
 slug = "vendor-swtos-image"
-status = "in-progress"
+status = "completed"
 description = "Commit program.bin and program.debug.json from sw-tos build/scheduled-shell with recorded provenance (source commit + crc24 build id), a refresh script, and include_bytes! wiring."
 role = "legacy"
 context_files = []
 created_at = "2026-08-28T09:20:27"
-commits = []
+completed_at = "2026-08-28T12:13:07"
+commits = ["3a946cbe17b00190c54861096e283b1a0cbb0505"]
