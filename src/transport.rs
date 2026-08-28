@@ -53,17 +53,26 @@ pub fn request(uart: &mut VirtualUart, payload: Vec<u8>) {
     }
 }
 
-/// Queue bytes for the target: raw before negotiation, and wrapped as a
-/// TTY_INPUT frame on the focused channel once framed.
+/// The most payload bytes the target's decoder will accept in one frame.
+/// `docs/protocol.md`: the host accepts 1024, "the bounded COR24 decoder
+/// accepts at most 16 bytes per frame". A longer frame is dropped in silence,
+/// which looks exactly like a command being ignored.
+const MAX_TARGET_PAYLOAD: usize = 16;
+
+/// Queue bytes for the target: raw before negotiation, and wrapped as
+/// TTY_INPUT frames on the focused channel once framed, split to the target's
+/// payload bound.
 pub fn transmit(uart: &mut VirtualUart, decoder: &ConnectionDecoder, channel: u8, bytes: &[u8]) {
     if decoder.mode() == Mode::Framed {
-        let frame = Frame {
-            kind: FrameType::TtyInput,
-            channel,
-            payload: bytes.to_vec(),
-        };
-        if let Ok(encoded) = frame.encode() {
-            uart.send(&encoded, FRAME_BYTE_CYCLES);
+        for chunk in bytes.chunks(MAX_TARGET_PAYLOAD) {
+            let frame = Frame {
+                kind: FrameType::TtyInput,
+                channel,
+                payload: chunk.to_vec(),
+            };
+            if let Ok(encoded) = frame.encode() {
+                uart.send(&encoded, FRAME_BYTE_CYCLES);
+            }
         }
         return;
     }

@@ -16,6 +16,10 @@ pub const CHANNEL: u8 = 254;
 pub struct Console {
     console: DebugConsole,
     input: String,
+    /// Requests sent with no reply yet. The target answers an endpoint that
+    /// holds no process, or a runway process with no parked ISR frame, with
+    /// silence -- indistinguishable from a broken debugger unless said.
+    awaiting: usize,
 }
 
 impl Default for Console {
@@ -26,6 +30,7 @@ impl Default for Console {
         Self {
             console: DebugConsole::new(None),
             input: String::new(),
+            awaiting: 0,
         }
     }
 }
@@ -44,10 +49,21 @@ impl Console {
         match key {
             "Enter" => {
                 desktop.push_channel(CHANNEL, b"\n");
+                if self.awaiting > 0 {
+                    desktop.push_channel(
+                        CHANNEL,
+                        b"(no reply to the previous request: the endpoint may hold no \
+                          process, or a runway process with no parked frame yet)\n",
+                    );
+                    self.awaiting = 0;
+                }
                 let result = self.console.command(&self.input);
                 self.input.clear();
                 for line in result.lines {
                     desktop.push_channel(CHANNEL, format!("{line}\n").as_bytes());
+                }
+                if result.request.is_some() {
+                    self.awaiting += 1;
                 }
                 result.request
             }
@@ -67,6 +83,7 @@ impl Console {
 
     /// Feed a DEBUG_RESPONSE payload back into the pane.
     pub fn response(&mut self, desktop: &mut Desktop, payload: &[u8]) {
+        self.awaiting = self.awaiting.saturating_sub(1);
         for line in self.console.response(payload) {
             desktop.push_channel(CHANNEL, format!("{line}\n").as_bytes());
         }
