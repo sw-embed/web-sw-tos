@@ -1,0 +1,11 @@
+{
+  "task_type": "rust-project-init",
+  "state": {
+    "number": 1,
+    "step": "scaffold-yew-project"
+  },
+  "action": "Ran sw-checklist -v on web-sw-cor24-apl first to learn the exact Web UI requirements (favicon.ico file + reference, footer naming Copyright/License/Repository/Build Host/Build Commit/Build Time), then designed to them; generated favicon.ico with a Python struct script; drew a full-bleed box in the scaffold screen as an alignment probe, which caught the global border-box reset clipping the rightmost column and bottom row, fixed with box-sizing: content-box; verified in Chrome by screenshot and zoom.",
+  "result": "success",
+  "reward": 1,
+  "timestamp": "2026-08-28T09:38:35"
+}
