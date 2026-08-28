@@ -1,9 +1,10 @@
 number = 6
 slug = "vendor-protocol"
-status = "in-progress"
+status = "completed"
 description = "Vendor ONLY the framed-transport module from te-rs. This is the risk-first sp..."
 role = "production"
 context_files = []
 created_at = "2026-08-28T12:15:28"
+completed_at = "2026-08-28T12:17:25"
 task_type = "vendoring"
-commits = []
+commits = ["1b10b52473cd903ba2e4d5ebc14b09ac6e8bcffd"]
