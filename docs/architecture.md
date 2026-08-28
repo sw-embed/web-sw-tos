@@ -64,6 +64,30 @@ into the frontend decoder, and bytes out of the frontend go into the pump.
 That is the same shape as the CLI, where the two processes share nothing but
 the byte stream.
 
+## Vendored code and sw-checklist
+
+`sw-checklist` limits apply to code this project owns. They are relaxed for
+files under `crates/swtos-frontend/src/` that are faithful copies of `te-rs`.
+
+`protocol.rs` fails Module Function Count with 25 functions against a maximum
+of 7, and warns on file length and two `push` implementations. Those limits
+could be satisfied by splitting the module into `frame` / `decoder` /
+`negotiation` submodules, and that is deliberately not done: the value of
+vendoring is that re-syncing with upstream is a copy plus a header, and a
+structural refactor turns every future re-vendor into a manual merge. Moving
+the tests out does not help either -- it clears the file-length warning but
+still leaves 18 functions.
+
+So the trade is a permanent, well-understood exception on a small number of
+copied files, versus permanent merge friction on every update to the
+reference implementation. The exception is the cheaper side.
+
+The rule this sets: **a vendored file carries an exception; a file we author
+does not.** If a vendored module is ever rewritten rather than copied, it
+loses the exception and must meet the limits like anything else. Commits that
+add or refresh vendored code carry a `sw-checklist: exception` trailer naming
+the file and the reason.
+
 ## What is vendored, and from where
 
 `../sw-tos` is read-only reference material and is never modified. The `te-rs`

@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/swtos-host"]
+members = ["crates/swtos-frontend", "crates/swtos-host"]
 
 [package]
 name = "web-sw-tos"

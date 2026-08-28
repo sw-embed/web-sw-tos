@@ -1,0 +1,9 @@
+[package]
+name = "swtos-frontend"
+version = "0.1.0"
+edition = "2024"
+authors = ["Michael A Wright"]
+license = "MIT"
+description = "Vendored SWTOS terminal frontend core for the browser demo"
+
+[dependencies]

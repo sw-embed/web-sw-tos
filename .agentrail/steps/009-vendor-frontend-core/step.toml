@@ -1,4 +1,4 @@
-number = 6
+number = 9
 slug = "vendor-frontend-core"
 status = "pending"
 description = "Copy and adapt te-rs protocol/ui/resource/debug; add render_grid returning cells; replace std::fs and Instant; verify the wasm32 build."

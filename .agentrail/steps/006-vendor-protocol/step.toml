@@ -1,0 +1,9 @@
+number = 6
+slug = "vendor-protocol"
+status = "in-progress"
+description = "Vendor ONLY the framed-transport module from te-rs. This is the risk-first sp..."
+role = "production"
+context_files = []
+created_at = "2026-08-28T12:15:28"
+task_type = "vendoring"
+commits = []
