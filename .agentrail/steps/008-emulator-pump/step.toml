@@ -1,6 +1,6 @@
 number = 8
 slug = "emulator-pump"
-status = "pending"
+status = "in-progress"
 description = "run_batch plus the 100 Hz FF 01 heartbeat on a browser timer, with drain-and-reset UART collection."
 role = "legacy"
 context_files = []

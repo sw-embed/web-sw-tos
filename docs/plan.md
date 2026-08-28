@@ -67,6 +67,55 @@ The acceptance proof is unchanged from the CLI: run two `cpu-hog` processes
 and show the Resources pane's `fp=` forced-preemption counts and `cpu=` samples
 advancing while Shell, Resources, and Debugger all stay responsive.
 
+## Measured throughput
+
+Taken at step 008, the step this plan was reordered to reach early. The
+question was whether WASM sustains the 100 Hz scheduler heartbeat.
+
+| Where | ms per tick | Effective rate |
+|---|---|---|
+| Native, release | 2.46 | 400 Hz equivalent |
+| WASM, `opt-level = 3` | 18.73 | 54 Hz |
+| WASM, `opt-level = "z"` | 16.78 | 61 Hz |
+
+A tick is 5 heartbeat bytes at `HEARTBEAT_BYTE_CYCLES` plus one `BATCH`, so
+150,000 emulated cycles. WASM runs about 7x slower than native here.
+
+`opt-level = "z"` is both faster and smaller than `opt-level = 3` (176 KB
+against 220 KB). That looks backwards until you remember the hot loop is an
+instruction decoder: the smaller build fits the dispatch path in cache, and
+the size win is free.
+
+Both WASM figures come from a **hidden** browser tab, which Chrome
+deprioritizes, so treat them as a pessimistic floor rather than what a viewer
+sees. Two measurement traps are worth recording, because both produced
+confidently wrong numbers first:
+
+- A hidden tab throttles timers to about 1 Hz. Measuring ticks per second
+  through a `setInterval` measured the throttle, not the emulator, and
+  reported 961 ms per tick.
+- Because of that throttle, work per callback must be derived from the wall
+  clock rather than assumed to be one tick. This is why the app catches up.
+
+### What ~60 Hz costs
+
+The heartbeat carries SWTOS's sense of time, so at 61 Hz its clock runs at
+about 60% of wall clock. Concretely:
+
+- **Shell responsiveness is unaffected.** Input latency is bounded by one
+  tick, around 17 ms, which is imperceptible.
+- **Preemption still works.** Forced preemption is driven by heartbeat
+  *count*, not by wall-clock rate, so the `cpu-hog` acceptance proof holds
+  and `fp=` counters still advance.
+- **Uptime and Clock run slow**, by the same 40%. This is the one visible
+  artifact.
+
+If the clock needs to be right, the lever is cycles per tick rather than the
+tick rate. `BATCH` is 50,000 of the 150,000 cycles and exists only to let the
+CPU run on beyond heartbeat pacing; shrinking it trades emulated CPU speed for
+a more accurate clock. Not tuned yet -- 60 Hz is good enough to build on, and
+tuning against a hidden-tab measurement would be tuning against noise.
+
 ## Known hazards
 
 - `UartLog` is an unbounded `Vec` with only `clear()`. The CLI adapter's

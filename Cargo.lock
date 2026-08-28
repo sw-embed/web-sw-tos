@@ -966,6 +966,7 @@ version = "0.1.0"
 name = "swtos-host"
 version = "0.1.0"
 dependencies = [
+ "cor24-emulator",
  "serde_json",
  "sha2",
 ]
@@ -1198,6 +1199,8 @@ dependencies = [
  "cor24-isa",
  "gloo 0.11.0",
  "js-sys",
+ "swtos-frontend",
+ "swtos-host",
  "wasm-bindgen",
  "web-sys",
  "yew",

@@ -14,6 +14,8 @@ repository = "https://github.com/sw-embed/web-sw-tos"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+swtos-host = { path = "crates/swtos-host" }
+swtos-frontend = { path = "crates/swtos-frontend" }
 cor24-emulator = { path = "../sw-cor24-emulator" }
 cor24-isa = { path = "../sw-cor24-isa", features = ["serde"] }
 yew = { version = "0.21", features = ["csr"] }
