@@ -27,6 +27,12 @@ in-process byte queues. Everything else keeps its shape.
   assets. `sw-tos/build/` and its PL/SW toolchain (`tools/bin/`) are both
   gitignored, so GitHub Actions can never build the image. Provenance (source
   `sw-tos` commit and the debug map's `crc24:` build id) is recorded alongside.
+  `program.bin` is embedded with `include_bytes!`; the **debug map is not**.
+  At 1.6 MB it would dwarf a bundle that is otherwise around 126 KB, and
+  because `pages/` is committed, every rebuild would add another copy of that
+  bulk to git history. Only the debugger pane needs it, and it can fetch the
+  map as a static asset when first opened. The map is embedded in the test
+  binary only, where the image/map consistency check lives.
 - **Frontend core**: vendor a copy of the `te-rs` modules into this repo.
   `sw-tos` does not grow a WASM feature and does not depend on this repo.
 - **Rendering**: one fixed-size character grid (selectable 80x24 / 120x43),

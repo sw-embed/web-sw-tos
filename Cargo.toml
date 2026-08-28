@@ -1,3 +1,6 @@
+[workspace]
+members = ["crates/swtos-host"]
+
 [package]
 name = "web-sw-tos"
 version = "0.1.0"

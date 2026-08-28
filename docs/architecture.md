@@ -24,11 +24,16 @@ crates/swtos-frontend/         vendored te-rs core        (step 003)
   src/resource.rs              RESOURCE_SNAPSHOT assembler
   src/debug.rs                 debugger console + debug map
 
-crates/swtos-host/             emulator side              (steps 002, 004, 005)
+crates/swtos-host/             emulator side
   src/lib.rs
-  src/image.rs                 vendored SWTOS image + provenance
+  src/image.rs                 vendored SWTOS image + identity   (done)
   src/uart.rs                  in-process virtual UART
   src/pump.rs                  run_batch driver + 100 Hz heartbeat
+
+assets/                        vendored, not built
+  program.bin                  embedded with include_bytes!
+  program.debug.json           served as a static asset, not compiled in
+  PROVENANCE.md                source commit, sizes, and identity table
 ```
 
 Each crate stays at or under seven modules, and two of the three stay at or

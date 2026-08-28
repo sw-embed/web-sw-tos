@@ -1,0 +1,13 @@
+[package]
+name = "swtos-host"
+version = "0.1.0"
+edition = "2024"
+authors = ["Michael A Wright"]
+license = "MIT"
+description = "Emulator-side host for the SWTOS browser demo: image, virtual UART, and pump"
+
+[dependencies]
+
+[dev-dependencies]
+serde_json = "1"
+sha2 = "0.10"
