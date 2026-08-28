@@ -973,6 +973,7 @@ dependencies = [
  "cor24-emulator",
  "serde_json",
  "sha2",
+ "swtos-frontend",
 ]
 
 [[package]]

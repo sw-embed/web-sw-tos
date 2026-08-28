@@ -104,7 +104,7 @@ impl Component for App {
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let (cols, rows) = chrome::GEOMETRIES[self.geometry];
-        let (tick, log_entries) = self.session.stats();
+        let status = self.session.status();
         let on_geometry = ctx.link().callback(|event: Event| {
             let select: HtmlSelectElement = event.target_unchecked_into();
             Msg::Geometry(select.selected_index().max(0) as usize)
@@ -117,8 +117,7 @@ impl Component for App {
                         { self.screen(cols, rows) }
                     </pre>
                 </div>
-                { chrome::diagnostics(
-                    self.session.prefix_armed(), tick, self.ms_per_tick, log_entries) }
+                { chrome::diagnostics(&status, self.ms_per_tick) }
                 { chrome::footer() }
             </>
         }

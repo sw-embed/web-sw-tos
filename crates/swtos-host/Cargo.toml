@@ -10,5 +10,6 @@ description = "Emulator-side host for the SWTOS browser demo: image, virtual UAR
 cor24-emulator = { path = "../../../sw-cor24-emulator" }
 
 [dev-dependencies]
+swtos-frontend = { path = "../swtos-frontend" }
 serde_json = "1"
 sha2 = "0.10"

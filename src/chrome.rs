@@ -3,6 +3,7 @@
 //! Header and footer live together so the crate stays inside sw-checklist's
 //! four-module budget while `view` stays inside its line budget.
 
+use crate::session::Status;
 use yew::prelude::*;
 
 const REPOSITORY: &str = "https://github.com/sw-embed/web-sw-tos";
@@ -14,15 +15,23 @@ pub const GEOMETRIES: [(usize, usize); 2] = [(80, 24), (120, 43)];
 /// The line under the screen. While the prefix is armed it becomes the
 /// command menu, which is the only place the Ctrl-A bindings are discoverable
 /// without already knowing them.
-pub fn diagnostics(prefix_armed: bool, tick: u32, ms_per_tick: f64, log: usize) -> Html {
-    let text = if prefix_armed {
+pub fn diagnostics(status: &Status, ms: f64) -> Html {
+    let text = if status.prefix_armed {
         "PREFIX -- ? help   z zoom   1-9 focus   n next   y copy-mode   \
          e send-Escape-to-app   x close"
             .to_string()
     } else {
+        // The transport mode is the single most useful thing here: plain
+        // means only the Shell can ever receive output.
+        let transport = if status.framed {
+            "framed"
+        } else {
+            "plain (negotiating)"
+        };
         format!(
-            "Ctrl-A then ? for commands   \u{2022}   tick {tick}   \
-             {ms_per_tick:.1} ms/tick   uart-log {log}"
+            "Ctrl-A then ? for commands   \u{2022}   transport {transport}   \
+             \u{2022}   tick {}   {ms:.1} ms/tick   uart-log {}",
+            status.tick, status.log_entries
         )
     };
     html! { <div class="diagnostics">{ text }</div> }

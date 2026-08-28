@@ -17,7 +17,11 @@ fn rendered(session: &Session) -> String {
 
 #[test]
 fn control_keys_use_their_terminal_encodings() {
-    assert_eq!(keys::to_bytes("Enter", false), b"\r", "Enter must be CR");
+    assert_eq!(
+        keys::to_bytes("Enter", false),
+        b"\n",
+        "the shell terminates on LF, not CR"
+    );
     assert_eq!(keys::to_bytes("Backspace", false), vec![0x08]);
     assert_eq!(keys::to_bytes("Tab", false), b"\t");
     assert_eq!(keys::to_bytes("Escape", false), vec![0x1b]);
@@ -46,12 +50,12 @@ fn the_prefix_is_consumed_and_the_next_key_is_a_command() {
         session.send_key("a", true).is_empty(),
         "prefix leaked to target"
     );
-    assert!(session.prefix_armed(), "prefix did not arm");
+    assert!(session.status().prefix_armed, "prefix did not arm");
     assert!(
         session.send_key("z", false).is_empty(),
         "command leaked to target"
     );
-    assert!(!session.prefix_armed(), "prefix stayed armed");
+    assert!(!session.status().prefix_armed, "prefix stayed armed");
 }
 
 /// Prefix-e is the only way to send Escape to a running application, which is

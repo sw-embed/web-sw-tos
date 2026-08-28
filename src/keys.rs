@@ -14,7 +14,10 @@ use swtos_frontend::ui::Desktop;
 /// character and are dropped rather than typed into the shell as words.
 pub fn to_bytes(key: &str, ctrl: bool) -> Vec<u8> {
     match (key, ctrl) {
-        ("Enter", _) => vec![b'\r'],
+        // LF, not CR. The SWTOS shell terminates every command on byte 10:
+        // sending 13 parses the command correctly and then answers BAD, which
+        // is why `help` and `ps -l` appeared unsupported.
+        ("Enter", _) => vec![b'\n'],
         ("Backspace", _) => vec![0x08],
         ("Tab", _) => vec![b'\t'],
         ("Escape", _) => vec![0x1b],
@@ -35,8 +38,7 @@ pub fn echo_bytes(bytes: &[u8]) -> Vec<u8> {
     bytes
         .iter()
         .filter_map(|byte| match byte {
-            b'\r' => Some(b'\n'),
-            0x08 | 0x20..=0x7e => Some(*byte),
+            b'\n' | 0x08 | 0x20..=0x7e => Some(*byte),
             _ => None,
         })
         .collect()
