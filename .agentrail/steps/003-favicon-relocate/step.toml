@@ -1,9 +1,10 @@
 number = 3
 slug = "favicon-relocate"
-status = "in-progress"
+status = "completed"
 description = "Relocate the desktop-icon favicon.ico out of the repo root and make the live ..."
 role = "production"
 context_files = []
 created_at = "2026-08-28T09:49:44"
+completed_at = "2026-08-28T09:51:08"
 task_type = "feature"
-commits = []
+commits = ["b0fd6b8eb7447d780a548c5c815289fbb4e4246e"]

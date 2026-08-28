@@ -1,0 +1,11 @@
+{
+  "task_type": "feature",
+  "state": {
+    "number": 3,
+    "step": "favicon-relocate"
+  },
+  "action": "git mv to static/ and back; discovered the sw-checklist root requirement empirically by running the check after the move; served pages/ via python http.server behind a symlinked /web-sw-tos/ path so the --public-url prefix resolved; compared shasum across source, bundle, and HTTP response.",
+  "result": "success",
+  "reward": 1,
+  "timestamp": "2026-08-28T09:51:08"
+}
