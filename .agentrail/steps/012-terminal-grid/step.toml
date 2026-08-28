@@ -1,8 +1,9 @@
 number = 12
 slug = "terminal-grid"
-status = "in-progress"
+status = "completed"
 description = "Fixed-size character grid with selectable 80x24 / 120x43 geometry."
 role = "legacy"
 context_files = []
 created_at = "2026-08-28T09:20:27"
-commits = []
+completed_at = "2026-08-28T13:18:16"
+commits = ["d9f73bba5d901841cd5b827939949b4c0fd0d47b"]
