@@ -1,8 +1,9 @@
 number = 8
 slug = "emulator-pump"
-status = "in-progress"
+status = "completed"
 description = "run_batch plus the 100 Hz FF 01 heartbeat on a browser timer, with drain-and-reset UART collection."
 role = "legacy"
 context_files = []
 created_at = "2026-08-28T09:20:27"
-commits = []
+completed_at = "2026-08-28T12:33:59"
+commits = ["fa9afe77bcfe95462fc8dcb9ef5a1f1b40214f2c"]
