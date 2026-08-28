@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SWTOS — Live Terminal Demo</title>
+    <link rel="icon" href="/web-sw-tos/favicon-f820c057065192ed.ico" integrity="sha384-sABjfyycuNgNBDkrKWHOa4ZxmONPXG6+Wj2Fve2iMcYAzL2fVUnyHvicwleMImD7"/>
+    
+<script type="module">
+import init, * as bindings from '/web-sw-tos/web-sw-tos-e13f18a7deaefcee.js';
+const wasm = await init({ module_or_path: '/web-sw-tos/web-sw-tos-e13f18a7deaefcee_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
+    <link rel="stylesheet" href="/web-sw-tos/app-1894f53fd6cdce7f.css" integrity="sha384-AXZP9wgyytVw8NIOKw6tctzpMJkEtZpqOki7RnVreFHjGYpt8J9q6L2cWs7zimpH"/>
+    <style>
+        /* Catppuccin Mocha */
+        :root {
+            --crust: #11111b;
+            --mantle: #181825;
+            --base: #1e1e2e;
+            --surface0: #313244;
+            --surface1: #45475a;
+            --surface2: #585b70;
+            --overlay0: #6c7086;
+            --overlay1: #7f849c;
+            --overlay2: #9399b2;
+            --subtext0: #a6adc8;
+            --subtext1: #bac2de;
+            --text: #cdd6f4;
+            --lavender: #b4befe;
+            --blue: #89b4fa;
+            --sapphire: #74c7ec;
+            --sky: #89dceb;
+            --teal: #94e2d5;
+            --green: #a6e3a1;
+            --yellow: #f9e2af;
+            --peach: #fab387;
+            --maroon: #eba0ac;
+            --red: #f38ba8;
+            --mauve: #cba6f7;
+            --pink: #f5c2e7;
+            --mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "SF Mono", Menlo, monospace;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: var(--mono);
+            font-size: 15px;
+            background: var(--crust);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        #app { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    </style>
+<link rel="modulepreload" href="/web-sw-tos/web-sw-tos-e13f18a7deaefcee.js" crossorigin="anonymous" integrity="sha384-De/pIwEIX8gvbLHodhAIW1KsJbgepZ+SgAHIUw4yM5I/jF9pr1va/pwwpRqbmU05"><link rel="preload" href="/web-sw-tos/web-sw-tos-e13f18a7deaefcee_bg.wasm" crossorigin="anonymous" integrity="sha384-KYt/qQ+UKgb+scNrErWWb6B2GsBpFldXiCVahQwMK04979AFWckdesnlrankz127" as="fetch" type="application/wasm"></head>
+<body>
+    <div id="app"></div>
+</body>
+</html>

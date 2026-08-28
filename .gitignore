@@ -1,0 +1,14 @@
+# Build artifacts
+/target
+/dist
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

@@ -1,0 +1,78 @@
+/* SWTOS live demo. One fixed-size character grid; no mouse, no scrollbars. */
+
+header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 12px 20px;
+    background: var(--mantle);
+    border-bottom: 1px solid var(--surface1);
+    flex-shrink: 0;
+}
+
+header h1 { font-size: 20px; font-weight: 700; color: var(--blue); }
+header .tagline { font-size: 14px; color: var(--overlay2); }
+
+/* The stage centres the grid and never scrolls it. */
+.stage {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    min-height: 0;
+    overflow: auto;
+}
+
+/*
+ * The grid is sized in character cells, not pixels, so the Rust side can lay
+ * panes out in exact columns and rows. `ch` is the advance width of "0" in a
+ * monospace face, and `overflow: hidden` guarantees a stray long line can
+ * never introduce a scrollbar.
+ */
+.terminal {
+    --cols: 80;
+    --rows: 24;
+    /*
+     * content-box, deliberately overriding the global border-box reset: width
+     * and height here describe the CHARACTER CELL AREA, and the padding must
+     * sit outside it. Under border-box the padding eats into the cell area and
+     * clips the rightmost column and the bottom row.
+     */
+    box-sizing: content-box;
+    font-family: var(--mono);
+    font-size: 15px;
+    line-height: 1.2;
+    width: calc(var(--cols) * 1ch);
+    height: calc(var(--rows) * 1.2em);
+    padding: 10px;
+    background: var(--base);
+    color: var(--text);
+    border: 1px solid var(--surface1);
+    border-radius: 6px;
+    white-space: pre;
+    overflow: hidden;
+    font-variant-ligatures: none;
+    font-kerning: none;
+    tab-size: 8;
+    user-select: none;
+}
+
+.terminal:focus { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 8px 20px;
+    font-size: 0.8em;
+    color: var(--overlay0);
+    background: var(--mantle);
+    border-top: 1px solid var(--surface1);
+    flex-shrink: 0;
+}
+
+footer a { color: var(--blue); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+.footer-sep { color: var(--surface2); }

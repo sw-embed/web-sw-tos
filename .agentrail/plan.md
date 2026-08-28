@@ -42,7 +42,7 @@ in-process byte queues. Everything else keeps its shape.
 | Module | Verdict |
 |---|---|
 | `protocol.rs` | Pure. Drops in unchanged. |
-| `ui.rs` | `VecDeque` + serde. Needs a `render_grid(w, h) -> Vec<Vec<char>>` that skips the three ANSI escapes `render()` emits. |
+| `ui.rs` | `VecDeque` + serde. Needs a `render_grid(w, h) -> Vec<Vec<Cell>>` that skips the three ANSI escapes `render()` emits. Cells rather than `char` from day one; see the ANSI-color section. |
 | `resource.rs` | Uses `std::time::Instant`, which panics on `wasm32-unknown-unknown`. Needs a time source abstraction. |
 | `debug.rs` | Loads the debug map with `std::fs`. Needs a `from_str` constructor. |
 | `main.rs` | termios and raw-fd bound. Not vendored; its event loop is rewritten as the app. |
@@ -166,8 +166,13 @@ rewritten, which is the migration this section exists to avoid.
 
 ### Sequencing
 
-The CLI is the reference implementation, so `te-rs` gains the SGR parser and
-the `Cell` grid first. This repo then re-vendors the updated modules; the
-vendored copy is a snapshot, and re-vendoring is the routine way it tracks
-upstream. Should the web demo need color first, the parser is written here and
-handed back as a patch to `te-rs` rather than left to diverge.
+Color is a longer-term goal in the CLI first and here second, but that ordering
+is a preference, not a dependency. **No work in this repo requires or implies a
+change to `sw-tos`.** The `Cell` grid lands here whenever this repo is ready,
+because `render_grid()` is already this repo's own adaptation of the vendored
+`ui.rs` -- upstream `te-rs` keeps its `render()` untouched.
+
+If `te-rs` later grows an SGR parser of its own, re-vendoring picks it up, which
+is the routine way this repo tracks upstream. If it does not, this repo writes
+its own. Either way the vendored copy is a snapshot that is free to diverge, and
+"upstream should change first" is never a reason to block work here.

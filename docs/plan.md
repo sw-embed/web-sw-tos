@@ -42,7 +42,7 @@ in-process byte queues. Everything else keeps its shape.
 | Module | Verdict |
 |---|---|
 | `protocol.rs` | Pure. Drops in unchanged. |
-| `ui.rs` | `VecDeque` + serde. Needs a `render_grid(w, h) -> Vec<Vec<char>>` that skips the three ANSI escapes `render()` emits. |
+| `ui.rs` | `VecDeque` + serde. Needs a `render_grid(w, h) -> Vec<Vec<Cell>>` that skips the three ANSI escapes `render()` emits. Cells rather than `char` from day one; see the ANSI-color section. |
 | `resource.rs` | Uses `std::time::Instant`, which panics on `wasm32-unknown-unknown`. Needs a time source abstraction. |
 | `debug.rs` | Loads the debug map with `std::fs`. Needs a `from_str` constructor. |
 | `main.rs` | termios and raw-fd bound. Not vendored; its event loop is rewritten as the app. |

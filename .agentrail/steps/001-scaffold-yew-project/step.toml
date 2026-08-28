@@ -1,6 +1,6 @@
 number = 1
 slug = "scaffold-yew-project"
-status = "pending"
+status = "in-progress"
 description = """
 Scaffold the Yew/Rust/WASM project for web-sw-tos. Read docs/plan.md first
 (P..."""
