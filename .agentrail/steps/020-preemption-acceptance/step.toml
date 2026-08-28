@@ -1,0 +1,8 @@
+number = 20
+slug = "preemption-acceptance"
+status = "pending"
+description = "The dual cpu-hog proof running in the browser."
+role = "legacy"
+context_files = []
+created_at = "2026-08-28T09:20:27"
+commits = []
