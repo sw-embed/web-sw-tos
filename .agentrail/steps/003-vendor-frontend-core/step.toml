@@ -1,0 +1,8 @@
+number = 3
+slug = "vendor-frontend-core"
+status = "pending"
+description = "Copy and adapt te-rs protocol/ui/resource/debug; add render_grid returning cells; replace std::fs and Instant; verify the wasm32 build."
+role = "legacy"
+context_files = []
+created_at = "2026-08-28T09:20:27"
+commits = []

@@ -1,0 +1,3 @@
+targets = []
+auto_apply = false
+exclude = ["global/branch-handoff.md"]

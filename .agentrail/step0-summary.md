@@ -1,0 +1,1 @@
+Bootstrapped the saga: cloned sw-cor24-emulator and sw-cor24-isa as siblings, wrote docs/plan.md (architecture, vendored-module triage, hazards, ANSI-color forward path), excluded the branch-handoff briefing fragment (no gh/PR flow in this repo), and wrote the project-specific CLAUDE.md.
