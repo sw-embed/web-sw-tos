@@ -1,0 +1,11 @@
+{
+  "task_type": "bug-fix",
+  "state": {
+    "number": 4,
+    "step": "fix-stale-build-stamp"
+  },
+  "action": "Spotted the stale commit while reading the footer in a screenshot of the deployed page; confirmed with git rev-parse against strings on the wasm; fixed by widening the rerun-if-changed set to the git ref.",
+  "result": "success",
+  "reward": 1,
+  "timestamp": "2026-08-28T10:00:53"
+}
