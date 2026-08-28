@@ -1,0 +1,11 @@
+{
+  "task_type": "docs",
+  "state": {
+    "number": 2,
+    "step": "readme-and-copyright"
+  },
+  "action": "Read ../sw-cor24-emulator/README.md for house style and compared LICENSE/COPYRIGHT strings across sw-tos, web-sw-cor24-apl, and sw-cor24-emulator to establish the canonical form; captured the page in Chrome and composed the screenshot with ImageMagick by stacking header/terminal/footer bands, because the capture viewport is a fixed height and a plain screenshot left a large empty band.",
+  "result": "success",
+  "reward": 1,
+  "timestamp": "2026-08-28T09:43:53"
+}

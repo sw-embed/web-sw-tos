@@ -1,9 +1,10 @@
 number = 2
 slug = "readme-and-copyright"
-status = "in-progress"
+status = "completed"
 description = "Rewrite README.md to the Software Wrighter house structure and normalize the ..."
 role = "production"
 context_files = []
 created_at = "2026-08-28T09:40:20"
+completed_at = "2026-08-28T09:43:53"
 task_type = "docs"
-commits = []
+commits = ["0f653d796fc996dfd82ce258043fb14a119f31cb"]
