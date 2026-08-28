@@ -5,27 +5,31 @@
 //! the decoder surfaces as `StreamItem::Plain` and which belong to channel 0,
 //! the Shell pane. Channels, applications, and the debugger arrive with
 //! framing; the desktop is already shaped for them.
+//!
+//! Three things about key handling are worth stating once, here, rather than
+//! at each branch of `send_key`:
+//!
+//! - Typed input is echoed locally because SWTOS never echoes. Without it
+//!   typing looks broken while every byte is in fact arriving. Control bytes
+//!   are filtered from the echo: a raw Escape renders as U+FFFD in a pane.
+//! - Prefix-`e` is the one frontend command that reaches the target. It sends
+//!   a real Escape, which is how Uptime and Clock are stopped, and cannot be
+//!   typed directly once copy mode and the help overlay also want Escape.
+//! - The Debugger and Resources panes are local consoles, not terminals.
+//!   Their channels have no TTY on the target, so routing their keys out as
+//!   TTY_INPUT discards every keystroke silently.
 
+use crate::debugger::Console;
 use crate::keys;
-use swtos_frontend::protocol::{ConnectionDecoder, Frame, FrameType, Mode, StreamItem, hello};
+use crate::transport;
+use swtos_frontend::protocol::{ConnectionDecoder, Mode};
 use swtos_frontend::ui::{Cell, Desktop};
 use swtos_host::pump::{Pump, heartbeat_frame};
-use swtos_host::uart::{FRAME_BYTE_CYCLES, HEARTBEAT_BYTE_CYCLES, VirtualUart};
+use swtos_host::uart::{HEARTBEAT_BYTE_CYCLES, VirtualUart};
 
 /// Cycles to run per tick beyond the heartbeat's own pacing. Matches the
 /// batch size the command-line adapter uses.
 const BATCH: u64 = 50_000;
-
-/// Cycles to run after each typed byte. The command-line adapter spends
-/// `FRAME_BYTE_CYCLES` (500,000) per byte, but that budget exists to let the
-/// target consume a whole frame; at ~150,000 cycles per tick it would stall
-/// the page for tens of milliseconds per keystroke. A keystroke only has to
-/// be lifted out of the UART receive ring, so it gets the heartbeat's smaller
-/// budget. Verified by typing at the live shell, not by reasoning alone.
-const KEY_BYTE_CYCLES: u64 = HEARTBEAT_BYTE_CYCLES;
-
-/// Channel zero is the Shell pane, and is where unframed output belongs.
-const SHELL: u8 = 0;
 
 /// What the status line needs, gathered in one call so the session does not
 /// grow an accessor per field.
@@ -55,6 +59,10 @@ pub struct Session {
     prefix_armed: bool,
     /// Tick at which the next HELLO goes out, while still unnegotiated.
     next_hello: u32,
+    /// The Debugger pane's local console. Not a TTY; see `debugger`.
+    console: Console,
+    /// Set once the debugger has greeted, after the transport goes framed.
+    greeted: bool,
 }
 
 impl Session {
@@ -69,19 +77,14 @@ impl Session {
         let started = js_sys::Date::now();
         let mut done = 0;
         while done < steps {
-            if self.decoder.mode() == Mode::Plain && self.tick >= self.next_hello {
-                if let Ok(bytes) = hello().encode() {
-                    self.uart.send(&bytes, FRAME_BYTE_CYCLES);
-                }
-                self.next_hello = self.tick.wrapping_add(HELLO_RETRY_TICKS);
-            }
+            self.negotiate();
             self.uart
                 .send(&heartbeat_frame(self.tick), HEARTBEAT_BYTE_CYCLES);
             self.tick = self.tick.wrapping_add(1);
             self.pump.run(&mut self.uart, BATCH);
             let output = self.uart.receive();
             for item in self.decoder.push(&output) {
-                self.route(item);
+                transport::route(&mut self.desktop, &mut self.console, item);
             }
             done += 1;
             if js_sys::Date::now() >= deadline {
@@ -114,22 +117,9 @@ impl Session {
     /// makes this key a frontend command. Ctrl-A arms that prefix. Copy mode
     /// claims navigation keys. Only what none of them wants reaches SWTOS.
     ///
-    /// Typed input is echoed locally because SWTOS never echoes: without it
-    /// typing looks broken while every byte is in fact arriving. Control bytes
-    /// are filtered out of the echo -- pushing a raw Escape into a pane
-    /// renders it as a replacement character.
-    ///
-    /// Prefix-`e` sends a real Escape to the focused application, which is how
-    /// Uptime and Clock are stopped. It cannot simply be typed once copy mode
-    /// and the help overlay also want Escape.
     pub fn send_key(&mut self, key: &str, ctrl: bool) -> Vec<u8> {
         if std::mem::take(&mut self.prefix_armed) {
-            if key == "e" {
-                self.transmit(&[0x1b]);
-                return vec![0x1b];
-            }
-            self.desktop.command(keys::command_byte(key));
-            return Vec::new();
+            return self.prefix_command(key);
         }
         if ctrl && key.eq_ignore_ascii_case(PREFIX) {
             self.prefix_armed = true;
@@ -138,56 +128,48 @@ impl Session {
         if self.desktop.copy_mode_enabled() && keys::copy_motion(&mut self.desktop, key) {
             return Vec::new();
         }
+        let kind = self.desktop.focused_kind();
+        if self
+            .console
+            .consume(kind, &mut self.desktop, &mut self.uart, key)
+        {
+            return Vec::new();
+        }
         let bytes = keys::to_bytes(key, ctrl);
         let channel = self.desktop.focused_channel();
         self.desktop
             .push_channel(channel, &keys::echo_bytes(&bytes));
-        self.transmit(&bytes);
+        self.send(&bytes);
         bytes
     }
 
-    /// Place one decoded item on the desktop.
-    ///
-    /// Plain bytes are the pre-negotiation recovery transport and belong to
-    /// the Shell. Framed TTY output is routed by channel, opening a pane for
-    /// a channel not seen before. Frame kinds owned by later steps are left
-    /// alone rather than silently dropped: an unhandled kind surfaces in the
-    /// status line so a missing feature looks missing instead of broken.
-    fn route(&mut self, item: StreamItem) {
-        match item {
-            StreamItem::Plain(bytes) => self.desktop.push_channel(SHELL, &bytes),
-            StreamItem::Frame(frame) if frame.kind == FrameType::TtyOutput => {
-                if !self.desktop.has_channel(frame.channel) {
-                    self.desktop
-                        .add_application(frame.channel, format!("TTY {}", frame.channel));
-                }
-                self.desktop.push_channel(frame.channel, &frame.payload);
-            }
-            StreamItem::Frame(frame) if frame.kind == FrameType::ChannelTitle => {
-                self.desktop
-                    .set_channel_title(frame.channel, String::from_utf8_lossy(&frame.payload));
-            }
-            StreamItem::Frame(frame) => self
-                .desktop
-                .set_error(Some(format!("unhandled frame {:?}", frame.kind))),
-            StreamItem::Error(error) => self.desktop.set_error(Some(format!("{error:?}"))),
+    /// Run one frontend command. Prefix-`e` is the exception that reaches the
+    /// target: it is how a running application is sent a real Escape.
+    fn prefix_command(&mut self, key: &str) -> Vec<u8> {
+        if key == "e" {
+            self.send(&[0x1b]);
+            return vec![0x1b];
+        }
+        self.desktop.command(keys::command_byte(key));
+        Vec::new()
+    }
+
+    /// Offer HELLO until framed, then greet in the Debugger pane once.
+    fn negotiate(&mut self) {
+        if self.tick >= self.next_hello {
+            transport::negotiate(&mut self.uart, &self.decoder);
+            self.next_hello = self.tick.wrapping_add(HELLO_RETRY_TICKS);
+        }
+        if self.decoder.mode() == Mode::Framed && !self.greeted {
+            self.greeted = true;
+            let request = self.console.greet(&mut self.desktop);
+            transport::request(&mut self.uart, request);
         }
     }
 
-    /// Queue bytes for the target: raw before negotiation, and wrapped as a
-    /// TTY_INPUT frame on the focused channel once framed.
-    fn transmit(&mut self, bytes: &[u8]) {
-        if self.decoder.mode() == Mode::Framed {
-            let frame = Frame {
-                kind: FrameType::TtyInput,
-                channel: self.desktop.focused_channel(),
-                payload: bytes.to_vec(),
-            };
-            if let Ok(encoded) = frame.encode() {
-                self.uart.send(&encoded, FRAME_BYTE_CYCLES);
-            }
-            return;
-        }
-        self.uart.send(bytes, KEY_BYTE_CYCLES);
+    /// Queue bytes for the target on the focused channel.
+    fn send(&mut self, bytes: &[u8]) {
+        let channel = self.desktop.focused_channel();
+        transport::transmit(&mut self.uart, &self.decoder, channel, bytes);
     }
 }

@@ -36,6 +36,9 @@ features = [
     "Window",
 ]
 
+[dev-dependencies]
+swtos-frontend = { path = "crates/swtos-frontend" }
+
 [profile.release]
 opt-level = "z"
 lto = true
