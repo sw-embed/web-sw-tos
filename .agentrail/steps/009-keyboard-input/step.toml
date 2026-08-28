@@ -1,6 +1,6 @@
-number = 11
+number = 9
 slug = "keyboard-input"
-status = "pending"
+status = "in-progress"
 description = "Key capture to framed TTY_INPUT, Ctrl-A prefix interception with preventDefault, Escape and backspace."
 role = "legacy"
 context_files = []

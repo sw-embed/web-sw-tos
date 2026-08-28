@@ -1,7 +1,7 @@
 number = 12
-slug = "deploy-shell-demo"
+slug = "terminal-grid"
 status = "pending"
-description = "Build pages/ and verify the live Shell-only demo end to end."
+description = "Fixed-size character grid with selectable 80x24 / 120x43 geometry."
 role = "legacy"
 context_files = []
 created_at = "2026-08-28T09:20:27"
