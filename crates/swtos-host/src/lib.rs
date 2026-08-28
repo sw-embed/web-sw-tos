@@ -5,3 +5,4 @@
 //! replaces the pty, and the pump that drives the emulator.
 
 pub mod image;
+pub mod uart;

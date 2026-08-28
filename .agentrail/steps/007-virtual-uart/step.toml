@@ -1,6 +1,6 @@
 number = 7
 slug = "virtual-uart"
-status = "pending"
+status = "in-progress"
 description = "In-process byte-queue transport replacing the pty, joining the frontend decoder to the emulator pump."
 role = "legacy"
 context_files = []
