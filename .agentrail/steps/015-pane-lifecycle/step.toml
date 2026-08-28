@@ -1,4 +1,4 @@
-number = 13
+number = 15
 slug = "pane-lifecycle"
 status = "pending"
 description = "Implement the pane lifecycle decisions recorded in docs/plan.md under 'Pane l..."

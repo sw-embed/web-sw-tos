@@ -1,4 +1,5 @@
 mod chrome;
+pub mod keys;
 pub mod session;
 
 use gloo::events::EventListener;
@@ -116,10 +117,8 @@ impl Component for App {
                         { self.screen(cols, rows) }
                     </pre>
                 </div>
-                <div class="diagnostics">
-                    { format!("tick {tick}  {:.3} ms/tick  budget {TICK_MS} ms  \
-                               uart-log {log_entries} entries", self.ms_per_tick) }
-                </div>
+                { chrome::diagnostics(
+                    self.session.prefix_armed(), tick, self.ms_per_tick, log_entries) }
                 { chrome::footer() }
             </>
         }

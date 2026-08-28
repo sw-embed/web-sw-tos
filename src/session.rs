@@ -6,6 +6,7 @@
 //! the Shell pane. Channels, applications, and the debugger arrive with
 //! framing; the desktop is already shaped for them.
 
+use crate::keys;
 use swtos_frontend::protocol::{ConnectionDecoder, StreamItem};
 use swtos_frontend::ui::{Cell, Desktop};
 use swtos_host::pump::{Pump, heartbeat_frame};
@@ -26,6 +27,9 @@ const KEY_BYTE_CYCLES: u64 = HEARTBEAT_BYTE_CYCLES;
 /// Channel zero is the Shell pane, and is where unframed output belongs.
 const SHELL: u8 = 0;
 
+/// The frontend prefix, as a terminal sends it: Ctrl-A is 0x01.
+const PREFIX: &str = "a";
+
 #[derive(Default)]
 pub struct Session {
     pump: Pump,
@@ -33,6 +37,8 @@ pub struct Session {
     decoder: ConnectionDecoder,
     desktop: Desktop,
     tick: u32,
+    /// Set by the prefix key; the next key is a frontend command, not input.
+    prefix_armed: bool,
 }
 
 impl Session {
@@ -76,40 +82,44 @@ impl Session {
         (self.tick, self.pump.log_len())
     }
 
-    /// Translate a browser key event into the bytes a terminal would send,
-    /// echo them into the Shell pane, and queue them for the target.
+    /// Handle one key. Returns whatever was queued for the target, which is
+    /// empty when the key was consumed by the frontend.
     ///
-    /// SWTOS speaks plain bytes until the framed transport is negotiated, so
-    /// the shell reads these directly. Ctrl-A through Ctrl-Z collapse to
-    /// 0x01..0x1a exactly as a real terminal encodes them, which matters
-    /// because Ctrl-A becomes the frontend prefix once panes exist. Named
-    /// keys such as "Shift" or "ArrowUp" are longer than one character and
-    /// are dropped rather than typed into the shell as words.
+    /// Three consumers sit in front of the target, in order. A pending prefix
+    /// makes this key a frontend command. Ctrl-A arms that prefix. Copy mode
+    /// claims navigation keys. Only what none of them wants reaches SWTOS.
     ///
-    /// The echo is not cosmetic: SWTOS never echoes input, so without it
-    /// typing looks broken while every byte is in fact arriving. Enter echoes
-    /// as a newline rather than the carriage return sent to the target,
-    /// because a pane treats CR as "restart this line". Returns what was
-    /// queued, which is how the mapping is tested.
+    /// Typed input is echoed locally because SWTOS never echoes: without it
+    /// typing looks broken while every byte is in fact arriving. Control bytes
+    /// are filtered out of the echo -- pushing a raw Escape into a pane
+    /// renders it as a replacement character.
     pub fn send_key(&mut self, key: &str, ctrl: bool) -> Vec<u8> {
-        let bytes: Vec<u8> = match (key, ctrl) {
-            ("Enter", _) => vec![b'\r'],
-            ("Backspace", _) => vec![0x08],
-            ("Tab", _) => vec![b'\t'],
-            ("Escape", _) => vec![0x1b],
-            (name, true) if name.len() == 1 => match name.as_bytes()[0].to_ascii_uppercase() {
-                c @ b'A'..=b'Z' => vec![c - b'A' + 1],
-                _ => return Vec::new(),
-            },
-            (text, false) if text.chars().count() == 1 => text.as_bytes().to_vec(),
-            _ => return Vec::new(),
-        };
-        let echo: Vec<u8> = bytes
-            .iter()
-            .map(|byte| if *byte == b'\r' { b'\n' } else { *byte })
-            .collect();
-        self.desktop.push_channel(SHELL, &echo);
+        if std::mem::take(&mut self.prefix_armed) {
+            // Prefix-e sends a real Escape to the focused application, which
+            // is how Uptime and Clock are stopped. It cannot be typed
+            // directly once copy mode and help also want Escape.
+            if key == "e" {
+                self.uart.send(&[0x1b], KEY_BYTE_CYCLES);
+                return vec![0x1b];
+            }
+            self.desktop.command(keys::command_byte(key));
+            return Vec::new();
+        }
+        if ctrl && key.eq_ignore_ascii_case(PREFIX) {
+            self.prefix_armed = true;
+            return Vec::new();
+        }
+        if self.desktop.copy_mode_enabled() && keys::copy_motion(&mut self.desktop, key) {
+            return Vec::new();
+        }
+        let bytes = keys::to_bytes(key, ctrl);
+        self.desktop.push_channel(SHELL, &keys::echo_bytes(&bytes));
         self.uart.send(&bytes, KEY_BYTE_CYCLES);
         bytes
+    }
+
+    /// True while the prefix is armed, for the status line.
+    pub fn prefix_armed(&self) -> bool {
+        self.prefix_armed
     }
 }

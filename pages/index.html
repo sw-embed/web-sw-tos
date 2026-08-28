@@ -7,8 +7,8 @@
     <link rel="icon" href="/web-sw-tos/favicon-bcf144d5b6f95c6d.ico" integrity="sha384-q14nRLPczzRgE8/zaImxLh2AXA8uRRiDIyWyuJhBLDExklCa6ZcQ9ZdgZh27xK6B"/>
     
 <script type="module">
-import init, * as bindings from '/web-sw-tos/web-sw-tos-66ae5a6096fae5d5.js';
-const wasm = await init({ module_or_path: '/web-sw-tos/web-sw-tos-66ae5a6096fae5d5_bg.wasm' });
+import init, * as bindings from '/web-sw-tos/web-sw-tos-f26b186039c8d4c4.js';
+const wasm = await init({ module_or_path: '/web-sw-tos/web-sw-tos-f26b186039c8d4c4_bg.wasm' });
 
 
 window.wasmBindings = bindings;
@@ -17,7 +17,7 @@ window.wasmBindings = bindings;
 dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
 
 </script>
-    <link rel="stylesheet" href="/web-sw-tos/app-783c016956ec3410.css" integrity="sha384-0o9BCwm9HRVs/UenanM1AvdfFG2x/xQ+q53oJhd/kbpPPLhfgIfw+piApPT0ccLd"/>
+    <link rel="stylesheet" href="/web-sw-tos/app-176da46ffb31373e.css" integrity="sha384-zbFQDzO+b0aOymDj8DvjumMYe5Tr7IgHs9KmhQqSxgeVbTY9cZUOLZJZX9u+8Gma"/>
     <style>
         /* Catppuccin Mocha */
         :root {
@@ -59,7 +59,7 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
         }
         #app { flex: 1; display: flex; flex-direction: column; min-height: 0; }
     </style>
-<link rel="modulepreload" href="/web-sw-tos/web-sw-tos-66ae5a6096fae5d5.js" crossorigin="anonymous" integrity="sha384-pD3/T+QFBqfa1QmeLUv0YEMzynyZm24HuAZYQ1KOafEox8Wm6M/srglK+BG6j1wk"><link rel="preload" href="/web-sw-tos/web-sw-tos-66ae5a6096fae5d5_bg.wasm" crossorigin="anonymous" integrity="sha384-QzrtaehoT+xKqQzU1IXai/+YURuk1Mq/aOMjymmuR9smMt2cEsJZL3bYD73vRYYU" as="fetch" type="application/wasm"></head>
+<link rel="modulepreload" href="/web-sw-tos/web-sw-tos-f26b186039c8d4c4.js" crossorigin="anonymous" integrity="sha384-pD3/T+QFBqfa1QmeLUv0YEMzynyZm24HuAZYQ1KOafEox8Wm6M/srglK+BG6j1wk"><link rel="preload" href="/web-sw-tos/web-sw-tos-f26b186039c8d4c4_bg.wasm" crossorigin="anonymous" integrity="sha384-8f9BJ0h9qj9ogy5rhzmr1AZwfRLLwLQiIkpHhTEli/NBa+fqLpamVXQNWscxQ5SX" as="fetch" type="application/wasm"></head>
 <body>
     <div id="app"></div>
 </body>

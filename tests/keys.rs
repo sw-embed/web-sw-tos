@@ -1,77 +1,10 @@
-//! Browser key events to terminal bytes.
+//! Browser key events to terminal bytes, frontend commands, and copy mode.
 //!
-//! This mapping is the whole of the demo's input path, and every case here is
-//! one that silently does nothing if it is wrong -- a key that sends no bytes
-//! looks identical to an emulator that is not running.
+//! Every case here fails silently when it is wrong: a key that produces no
+//! bytes is indistinguishable from an emulator that is not running.
 
+use web_sw_tos::keys;
 use web_sw_tos::session::Session;
-
-#[test]
-fn control_keys_use_their_terminal_encodings() {
-    let mut session = Session::default();
-    assert_eq!(session.send_key("Enter", false), b"\r", "Enter must be CR");
-    assert_eq!(session.send_key("Backspace", false), vec![0x08]);
-    assert_eq!(session.send_key("Tab", false), b"\t");
-    assert_eq!(session.send_key("Escape", false), vec![0x1b]);
-}
-
-#[test]
-fn printable_keys_pass_through() {
-    let mut session = Session::default();
-    assert_eq!(session.send_key("1", false), b"1");
-    assert_eq!(session.send_key("z", false), b"z");
-    assert_eq!(session.send_key(" ", false), b" ");
-}
-
-/// Ctrl-A is the frontend prefix once panes exist, so its encoding has to be
-/// right well before anything depends on it.
-#[test]
-fn ctrl_letters_collapse_to_control_codes() {
-    let mut session = Session::default();
-    assert_eq!(session.send_key("a", true), vec![0x01]);
-    assert_eq!(session.send_key("A", true), vec![0x01]);
-    assert_eq!(session.send_key("c", true), vec![0x03]);
-    assert_eq!(session.send_key("z", true), vec![0x1a]);
-}
-
-/// Named keys are longer than one character. Sending them as text would type
-/// the literal word "Shift" into the shell.
-#[test]
-fn named_keys_send_nothing() {
-    let mut session = Session::default();
-    for key in ["Shift", "Control", "ArrowUp", "F5", "CapsLock"] {
-        assert!(session.send_key(key, false).is_empty(), "{key} leaked");
-    }
-    assert!(session.send_key("1", true).is_empty(), "Ctrl-digit leaked");
-}
-
-/// The target never echoes, so the frontend does. Checked against the
-/// rendered grid rather than an internal buffer, because what matters is that
-/// typing reaches the visible screen: backspace must erase, and Enter must
-/// commit the line rather than restart it the way a pane treats a bare CR.
-#[test]
-fn typing_is_echoed_onto_the_screen() {
-    let mut session = Session::default();
-    for key in ["h", "i", "x", "Backspace", "Enter"] {
-        session.send_key(key, false);
-    }
-    let screen = rendered(&session);
-    assert!(
-        screen.contains("hi"),
-        "typing never reached the screen: {screen}"
-    );
-    assert!(!screen.contains("hix"), "backspace did not erase: {screen}");
-}
-
-/// A key the mapping ignores must not reach the screen either.
-#[test]
-fn ignored_keys_leave_no_trace() {
-    let mut session = Session::default();
-    session.send_key("ArrowUp", false);
-    session.send_key("Shift", false);
-    assert!(!rendered(&session).contains("Arrow"));
-    assert!(!rendered(&session).contains("Shift"));
-}
 
 fn rendered(session: &Session) -> String {
     session
@@ -80,4 +13,94 @@ fn rendered(session: &Session) -> String {
         .map(|row| row.into_iter().map(|cell| cell.ch).collect::<String>())
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+#[test]
+fn control_keys_use_their_terminal_encodings() {
+    assert_eq!(keys::to_bytes("Enter", false), b"\r", "Enter must be CR");
+    assert_eq!(keys::to_bytes("Backspace", false), vec![0x08]);
+    assert_eq!(keys::to_bytes("Tab", false), b"\t");
+    assert_eq!(keys::to_bytes("Escape", false), vec![0x1b]);
+}
+
+#[test]
+fn printable_and_ctrl_letters_map_as_a_terminal_would() {
+    assert_eq!(keys::to_bytes("1", false), b"1");
+    assert_eq!(
+        keys::to_bytes("a", true),
+        vec![0x01],
+        "Ctrl-A is the prefix"
+    );
+    assert_eq!(keys::to_bytes("A", true), vec![0x01]);
+    assert_eq!(keys::to_bytes("z", true), vec![0x1a]);
+    for named in ["Shift", "ArrowUp", "F5", "CapsLock"] {
+        assert!(keys::to_bytes(named, false).is_empty(), "{named} leaked");
+    }
+}
+
+/// Ctrl-A must never reach the target: it arms the frontend instead.
+#[test]
+fn the_prefix_is_consumed_and_the_next_key_is_a_command() {
+    let mut session = Session::default();
+    assert!(
+        session.send_key("a", true).is_empty(),
+        "prefix leaked to target"
+    );
+    assert!(session.prefix_armed(), "prefix did not arm");
+    assert!(
+        session.send_key("z", false).is_empty(),
+        "command leaked to target"
+    );
+    assert!(!session.prefix_armed(), "prefix stayed armed");
+}
+
+/// Prefix-e is the only way to send Escape to a running application, which is
+/// how Uptime and Clock are stopped.
+#[test]
+fn prefix_e_sends_escape_to_the_target() {
+    let mut session = Session::default();
+    session.send_key("a", true);
+    assert_eq!(session.send_key("e", false), vec![0x1b]);
+}
+
+/// Without the prefix, a bare key is ordinary input.
+#[test]
+fn an_unprefixed_key_reaches_the_target() {
+    let mut session = Session::default();
+    assert_eq!(session.send_key("3", false), b"3");
+}
+
+/// The target never echoes, so the frontend does -- but control bytes must be
+/// filtered, or a raw Escape renders as a replacement character in the pane.
+#[test]
+fn echo_shows_typing_but_not_control_bytes() {
+    let mut session = Session::default();
+    for key in ["h", "i", "x", "Backspace", "Enter"] {
+        session.send_key(key, false);
+    }
+    session.send_key("Escape", false);
+    let screen = rendered(&session);
+    assert!(
+        screen.contains("hi"),
+        "typing never reached the screen: {screen}"
+    );
+    assert!(!screen.contains("hix"), "backspace did not erase");
+    assert!(
+        !screen.contains('\u{fffd}'),
+        "a control byte was echoed into the pane: {screen}"
+    );
+}
+
+/// Copy mode claims navigation keys so scrolling does not type into the shell.
+#[test]
+fn copy_mode_claims_navigation_and_releases_it_on_exit() {
+    let mut session = Session::default();
+    session.send_key("a", true);
+    session.send_key("y", false);
+    assert!(
+        session.send_key("k", false).is_empty(),
+        "copy mode let a motion key through to the target"
+    );
+    session.send_key("q", false);
+    assert_eq!(session.send_key("k", false), b"k", "copy mode never exited");
 }

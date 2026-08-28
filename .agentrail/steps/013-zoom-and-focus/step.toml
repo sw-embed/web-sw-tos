@@ -1,6 +1,6 @@
-number = 18
+number = 13
 slug = "zoom-and-focus"
-status = "pending"
+status = "in-progress"
 description = "Ctrl-A 1-9, n, s, x, a, z."
 role = "legacy"
 context_files = []

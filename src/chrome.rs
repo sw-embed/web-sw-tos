@@ -11,6 +11,23 @@ const REPOSITORY: &str = "https://github.com/sw-embed/web-sw-tos";
 /// character screen, and these are the classic small and large choices.
 pub const GEOMETRIES: [(usize, usize); 2] = [(80, 24), (120, 43)];
 
+/// The line under the screen. While the prefix is armed it becomes the
+/// command menu, which is the only place the Ctrl-A bindings are discoverable
+/// without already knowing them.
+pub fn diagnostics(prefix_armed: bool, tick: u32, ms_per_tick: f64, log: usize) -> Html {
+    let text = if prefix_armed {
+        "PREFIX -- ? help   z zoom   1-9 focus   n next   y copy-mode   \
+         e send-Escape-to-app   x close"
+            .to_string()
+    } else {
+        format!(
+            "Ctrl-A then ? for commands   \u{2022}   tick {tick}   \
+             {ms_per_tick:.1} ms/tick   uart-log {log}"
+        )
+    };
+    html! { <div class="diagnostics">{ text }</div> }
+}
+
 /// Title bar and the geometry selector. The selector is page chrome rather
 /// than a terminal control: the character screen itself takes no mouse input.
 pub fn header(geometry: usize, on_change: Callback<Event>) -> Html {
@@ -35,27 +52,23 @@ pub fn footer() -> Html {
     html! {
         <footer>
             <span>{ "Copyright (c) 2026 Michael A Wright" }</span>
-            { separator() }
+            { html! { <span class="footer-sep">{ "\u{00b7}" }</span> } }
             <span>{ "MIT License" }</span>
-            { separator() }
+            { html! { <span class="footer-sep">{ "\u{00b7}" }</span> } }
             <a href={REPOSITORY} target="_blank">{ "Repository" }</a>
-            { separator() }
+            { html! { <span class="footer-sep">{ "\u{00b7}" }</span> } }
             { build_info() }
         </footer>
     }
-}
-
-fn separator() -> Html {
-    html! { <span class="footer-sep">{ "\u{00b7}" }</span> }
 }
 
 fn build_info() -> Html {
     html! {
         <>
             <span>{ format!("Build Host {}", env!("BUILD_HOST")) }</span>
-            { separator() }
+            { html! { <span class="footer-sep">{ "\u{00b7}" }</span> } }
             <span>{ format!("Build Commit {}", env!("BUILD_SHA")) }</span>
-            { separator() }
+            { html! { <span class="footer-sep">{ "\u{00b7}" }</span> } }
             <span>{ format!("Build Time {}", env!("BUILD_TIMESTAMP")) }</span>
         </>
     }
