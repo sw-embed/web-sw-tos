@@ -6,7 +6,7 @@ Rust compiled to WebAssembly, with no server and nothing to install.
 
 **[Live Demo](https://sw-embed.github.io/web-sw-tos/)**
 
-![SWTOS running in the browser](images/screenshot.png?ts=1787935381000)
+![SWTOS running in the browser](images/screenshot.png?ts=1787946868000)
 
 Part of the [Software Wrighter COR24 Tools Project](https://sw-embed.github.io/web-sw-cor24-demos/#/).
 
@@ -49,32 +49,65 @@ a simulation of one, is the point of this demo.
 
 ## Status
 
-Under construction. The scaffold is in place and the character grid renders;
-the emulator, virtual UART, and panes are not wired up yet.
+**The shell is live and interactive.** SWTOS boots on the emulated CPU, prints
+its menu, and responds to your keystrokes. Press `1` for Hello, `2` for
+Counter, `5` for the multitasking demo -- the screenshot above shows two
+processes interleaving their output (`B1`, `C1`, `B2`, `C2`).
+
+The tiled pane frontend is still being ported.
 
 | Phase | Scope | State |
 |---|---|---|
-| 0 | Foundation: scaffold, vendored image, vendored frontend core | in progress |
-| 1 | An interactive Shell pane over the virtual UART | planned |
-| 2 | Application, resources, and debugger panes; zoom; copy mode; the preemption proof | planned |
+| 0 | Foundation: scaffold, vendored image, vendored transport | done |
+| 1 | An interactive Shell over the virtual UART | done |
+| 2 | Tiled panes, zoom, copy-mode scrollback, the preemption proof | in progress |
+
+### Performance
+
+The emulator runs about 7x slower in WebAssembly than natively, reaching
+roughly 60 scheduler ticks per second against a target of 100. Typing latency
+is bounded by one tick and is imperceptible, and preemption is unaffected
+because it is driven by heartbeat count rather than wall-clock rate. The one
+visible artifact is that the Uptime and Clock programs run slow. See
+[docs/plan.md](docs/plan.md) for the measurements.
 
 ## Usage
 
-Once Phase 1 lands, the frontend prefix is `Ctrl-A`. Release it before typing
-the command; each command needs its own prefix.
+Click into the page and type. Keys go to the target wherever focus sits, so
+there is nothing to click first. `Cmd`/`Alt` combinations are left to the
+browser, so reload and devtools keep working.
+
+At the `Choice:` prompt, press a digit:
+
+| Key | Program |
+|---|---|
+| `1` | Hello |
+| `2` | Counter |
+| `3` | Uptime |
+| `4` | Clock |
+| `5` | Multitask -- two processes interleaving |
+| `6` | UART test |
+
+Once the tiled frontend lands, the frontend prefix is `Ctrl-A`. Release it
+before typing the command; each command needs its own prefix.
 
 | Prefix command | Action |
 |---|---|
 | `1` through `9` | Focus a pane by number |
 | `n` | Focus the next pane |
 | `s` | Add a pane |
+| `c` | Clear the focused pane |
 | `x` | Close the focused pane |
 | `z` | Toggle zoom for the focused pane |
 | `y` | Enter or leave copy mode |
 | `?` | Toggle help |
 
-In copy mode, navigate with the arrow keys or `hjkl`, page with `PgUp` and
-`PgDn`, jump to either end with `g` and `G`, and leave with `q`.
+In copy mode, navigate with the arrow keys or `hjkl`, page with `PgUp`/`PgDn`,
+jump with `g`/`G`, and leave with `q`.
+
+There is deliberately no mouse support, no scrollbars, and no copy/paste. The
+demo reproduces a terminal, and layout, focus, zoom, and scrolling all belong
+to the frontend rather than to the browser.
 
 ## Documentation
 
