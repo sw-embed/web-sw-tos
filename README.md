@@ -160,10 +160,14 @@ trunk build                # dev build to dist/
 ### Quality gates
 
 ```bash
-cargo clippy --all-targets --all-features -- -D warnings
-cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo fmt -p web-sw-tos -p swtos-frontend -p swtos-host -- --check
 sw-checklist
 ```
+
+Format with the packages named, never `cargo fmt --all`: rustfmt follows path
+dependencies across workspace boundaries and would reformat the sibling
+emulator checkout.
 
 Clippy runs clean with zero warnings; warnings are fixed, never suppressed.
 `sw-checklist` is expected to stay at 16 passed, 0 failed, 0 warnings.

@@ -281,10 +281,29 @@ Edition 2024. Never suppress warnings.
 trunk build                                               # dev build to dist/
 ./scripts/serve.sh                                        # dev server
 ./scripts/build-pages.sh                                  # release -> pages/
-cargo clippy --all-targets --all-features -- -D warnings
-cargo fmt --all
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo fmt -p web-sw-tos -p swtos-frontend -p swtos-host   # NOT --all; see below
 sw-checklist
 ```
+
+### NEVER run `cargo fmt --all` in this repo
+
+`cargo fmt --all` follows **path dependencies across workspace boundaries**.
+`../sw-cor24-emulator` declares its own `[workspace]`, which excludes it from
+cargo's package graph but does **not** exclude it from rustfmt: fmt still picks
+up its crate roots (`src/lib.rs`, `cli/src/main.rs`, `tests/`, `examples/`) and
+reformats everything reachable by `mod` from them. That silently rewrote 17
+files in a sibling repo during this project.
+
+Always name the packages:
+
+```bash
+cargo fmt -p web-sw-tos -p swtos-frontend -p swtos-host
+```
+
+`cargo clippy --workspace` is safe -- it lints only the three local packages
+and compiles siblings as plain dependencies. Clippy never writes without
+`--fix`, which this project does not use.
 
 The Pages workflow deploys the **committed** `pages/` directory, so
 `build-pages.sh` must run and `pages/` must be staged whenever web source
