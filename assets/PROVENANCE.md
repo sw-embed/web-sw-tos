@@ -13,7 +13,7 @@ deployed from a clean checkout.
 | Field | Value |
 |---|---|
 | Source repository | `sw-embed/sw-tos` |
-| Source commit | `d6dbce9da8e636fb5e671e368dc7f464e0eb0a98` |
+| Source commit | `1e75960e1b0751bdf42c103412a9b18eafc25329` |
 | Source path | `build/scheduled-shell/` |
 | Vendored on | 2026-08-28 (re-vendored) |
 | Build recipe | `just scheduled-shell-build` |
@@ -27,8 +27,8 @@ above. Recorded because a dirty source tree is otherwise invisible later.
 
 | File | Size | Role |
 |---|---|---|
-| `program.bin` | 24,870 bytes | The preemptive-multitasking image, loaded at address 0 |
-| `program.debug.json` | 1,681,291 bytes | Symbol, function, and instruction map for the debugger pane |
+| `program.bin` | 25,529 bytes | The preemptive-multitasking image, loaded at address 0 |
+| `program.debug.json` | 1,728,900 bytes | Symbol, function, and instruction map for the debugger pane |
 
 ## Identity
 
@@ -38,10 +38,10 @@ be replaced together.
 | Field | Value |
 |---|---|
 | `format` | `swtos-debug-v1` |
-| `build_id` | `crc24:30c68b` |
-| `build_id_size` | 8578 |
-| `image_size` | 24870 |
-| `image_sha256` | `1bc6834b9d2fd6b60fab8e2e5b18e64c886d355e611d70e6d6b10c49ff5d93b7` |
+| `build_id` | `crc24:67d633` |
+| `build_id_size` | 8684 |
+| `image_size` | 25529 |
+| `image_sha256` | `1f1480bf12e0657566565dee89e11d0fc0fb8dec1bf551b0471dbfea7f3943f6` |
 
 `build_id` is the identity the SWTOS debugger's identity opcode returns, as a
 CRC over the image's immutable range. `crates/swtos-host/src/image.rs` mirrors

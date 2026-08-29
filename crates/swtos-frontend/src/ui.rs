@@ -3,12 +3,12 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/ui.rs
-//!   source commit: d6dbce9
-//!   vendored:      2026-08-28 (re-vendored)
+//!   source commit: 1e75960 (taken from the committed tree, not a dirty
+//!                  working copy -- upstream had uncommitted edits here)
+//!   vendored:      2026-08-29
 //!
-//! Adapted: renders into a `Cell` grid rather than an ANSI string, and
-//! the body is height-1 rows so the grid exactly fills the browser's fixed
-//! character screen. See docs/plan.md for why cells rather than `char`.
+//! Adapted: adds `Cell`, `Color`, `Attrs`, a `render_grid` adapter over
+//! upstream's `render`, and `clear_focused`. See docs/architecture.md.
 
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -17,8 +17,7 @@ use std::collections::VecDeque;
 ///
 /// Colour and attributes are carried from the start even though nothing sets
 /// them yet: returning `char` would force both this API and the browser
-/// renderer to be rewritten when colour arrives. See the ANSI section of
-/// `docs/plan.md`.
+/// renderer to be rewritten when colour arrives.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cell {
     pub ch: char,
@@ -95,7 +94,8 @@ impl PaneKind {
             Self::Shell => "Shell",
             Self::Application => "Application",
             Self::Debugger => "Debugger",
-            Self::Resources => "Resources",
+            // Named for the mon program that reports the same figures.
+            Self::Resources => "mon",
         }
     }
 
@@ -351,10 +351,35 @@ impl Desktop {
         self.focus
     }
 
+    /// Put back any system pane that has been closed.
+    ///
+    /// Ctrl-A x removes whatever holds focus, and closing Resources or the
+    /// debugger was otherwise unrecoverable: reloading a saved layout is the
+    /// only other route back and helps only if a layout was ever saved. Each
+    /// missing pane returns at its canonical position, so the numbering a
+    /// person has learned survives the accident.
+    pub fn restore_system_panes(&mut self) -> usize {
+        let mut restored = 0;
+        for (position, kind) in PaneKind::ALL.into_iter().enumerate() {
+            if self.panes.iter().any(|pane| pane.kind == kind) {
+                continue;
+            }
+            let at = position.min(self.panes.len());
+            self.panes.insert(
+                at,
+                Pane::new(kind, kind.default_channel(), kind.title(), DEFAULT_SCROLLBACK),
+            );
+            if self.focus >= at {
+                self.focus += 1;
+            }
+            restored += 1;
+        }
+        restored
+    }
+
     /// Empty the focused pane: scrollback, partial line, and scroll offset.
     ///
-    /// LOCAL ADDITION, not upstream. `te-rs` has no clear command at all, so
-    /// the only way to discard a pane's output there is to close the pane.
+    /// LOCAL ADDITION, not upstream. `te-rs` has no clear command at all.
     /// Additive rather than a change to existing logic, which is what keeps it
     /// cheap to re-apply across re-vendoring.
     pub fn clear_focused(&mut self) {
@@ -447,6 +472,9 @@ impl Desktop {
                 self.zoomed = !self.zoomed;
             }
             b'x' => self.close_focused(),
+            b'S' => {
+                self.restore_system_panes();
+            }
             b'y' => self.copy_mode = !self.copy_mode,
             b'w' => return CommandOutcome::Save,
             b'b' if self.broadcast_armed => {
@@ -473,13 +501,8 @@ impl Desktop {
     /// Adapts upstream's `render`, which returns a `String` carrying
     /// `\x1b[H`, a per-line `\x1b[K`, and `\r\n` to drive a real terminal.
     /// Stripping those three back out is deliberately preferred over
-    /// converting every canvas write to cells: `ui.rs` grew 375 lines in a
-    /// single upstream cycle, and an adapter survives that untouched while an
-    /// invasive conversion must be redone by hand each time.
-    ///
-    /// When colour arrives it enters through the pane content as SGR, which
-    /// this is the one place to parse -- the three escapes above are terminal
-    /// chrome and never reach the browser.
+    /// converting every canvas write to cells: an adapter survives upstream
+    /// churn that an invasive conversion would not.
     pub fn render_grid(&self, width: usize, height: usize) -> Vec<Vec<Cell>> {
         let text = self.render(width, height).replace("\x1b[H", "");
         let mut rows: Vec<Vec<Cell>> = text
@@ -514,7 +537,8 @@ impl Desktop {
                     title: "Help",
                     lines: &[
                         "1-9 focus  n next  p previous  z zoom  s split  x close",
-                        "y copy  b,b broadcast  w save  R restore-layout",
+                        "S restore-system-panes  y copy  b,b broadcast",
+                        "w save  R restore-layout",
                         "copy: arrows/hjkl  PgUp/PgDn  g/G  q exit",
                         "r reconnect/redraw  e target-Escape  ? help  d detach",
                         "close help: q, Escape, or ?",
@@ -559,6 +583,7 @@ impl Desktop {
         output.push_str("\x1b[K\r\n");
         output
     }
+
 }
 
 /// The tiling: how many rows and columns, and the width left for panes once
@@ -576,10 +601,10 @@ impl Desktop {
     /// Boxing each pane separately spends two lines per row on borders and a
     /// column on each outer edge, which at nine rows costs half the display.
     /// Panes here share one rule per row and one rule per column boundary, and
-    /// there is no outer frame at all. A rule names the pane above it and the
-    /// pane below it in each column, so the titles cost no extra lines:
+    /// there is no outer frame at all. Each rule names the pane directly
+    /// beneath it in every column, so the titles cost no extra lines:
     ///
-    ///   -- ^ Shell ------- v Debugger ---|-- ^ TTY 2 ------ v TTY 3 -------
+    ///   --1 v Shell -------------------|--2 v Application --------------
     fn draw_grid(&self, canvas: &mut [Vec<char>], width: usize, height: usize) {
         let columns = if self.panes.len() <= 1 { 1 } else { 2 };
         let grid = Grid {
@@ -592,10 +617,9 @@ impl Desktop {
             return;
         }
 
-        // Rules sit between rows only. The top line is content, not a border,
-        // and the footer closes the bottom; a single row still needs one rule
-        // to carry its names, so it gets one beneath it.
-        let rules = if grid.rows == 1 { 1 } else { grid.rows - 1 };
+        // One rule above each row and none below the last, so a name sits over
+        // the pane it names and the footer closes the grid.
+        let rules = grid.rows;
         if height <= rules {
             return;
         }
@@ -605,6 +629,8 @@ impl Desktop {
         for row in 0..grid.rows {
             let content_height =
                 (row + 1) * content_total / grid.rows - row * content_total / grid.rows;
+            self.draw_rule(canvas, y, &grid, row);
+            y += 1;
             let mut x = 0;
             for column in 0..columns {
                 let pane_width = (column + 1) * grid.column_total / columns
@@ -625,14 +651,10 @@ impl Desktop {
                 }
             }
             y += content_height;
-            if row + 1 < grid.rows || grid.rows == 1 {
-                self.draw_rule(canvas, y, &grid, row);
-                y += 1;
-            }
         }
     }
 
-    /// Draw one horizontal rule, naming the pane above and below per column.
+    /// Draw one horizontal rule, naming the pane it sits over in each column.
     fn draw_rule(&self, canvas: &mut [Vec<char>], y: usize, grid: &Grid, row: usize) {
         if y >= canvas.len() {
             return;
@@ -643,32 +665,15 @@ impl Desktop {
         let columns = grid.columns;
         let mut x = 0;
         for column in 0..columns {
-            let pane_width =
-                (column + 1) * grid.column_total / columns - column * grid.column_total / columns;
-            let end = x + pane_width;
-            let above = Some(row * columns + column).filter(|index| *index < self.panes.len());
-            let below = Some((row + 1) * columns + column)
-                .filter(|index| *index < self.panes.len() && row + 1 < grid.rows);
-            // Lay the two names out from what they need rather than by
-            // splitting the column in half: the lower name sits at the middle
-            // when both fit comfortably, and slides right only as far as a long
-            // upper name pushes it. A fixed midpoint clips a long upper name on
-            // a narrow terminal while leaving dashes to the right of a short
-            // lower one.
-            let above_span = above.map_or(0, |index| self.label_for(index, '^').chars().count());
-            let below_span = below.map_or(0, |index| self.label_for(index, 'v').chars().count());
-            let lead = usize::from(above_span + below_span + 2 <= pane_width) * 2;
-            let mut limit = end;
-            if let Some(index) = below {
-                let start = (x + pane_width / 2)
-                    .max(x + lead + above_span)
-                    .min(end.saturating_sub(below_span))
-                    .max(x);
-                self.write_label(canvas, y, start, end, 'v', index);
-                limit = start;
-            }
-            if let Some(index) = above {
-                self.write_label(canvas, y, x + lead, limit, '^', index);
+            let pane_width = (column + 1) * grid.column_total / columns
+                - column * grid.column_total / columns;
+            // One name per column, for the pane directly beneath. Naming both
+            // neighbours would repeat every middle pane's name on two rules
+            // and leave each one half a column to fit in.
+            let index = row * columns + column;
+            if index < self.panes.len() {
+                let lead = usize::from(self.label_for(index).chars().count() + 2 <= pane_width) * 2;
+                self.write_label(canvas, y, x + lead, x + pane_width, index);
             }
             x += pane_width;
             if column + 1 < columns {
@@ -680,14 +685,13 @@ impl Desktop {
         }
     }
 
-    fn label_for(&self, index: usize, marker: char) -> String {
+    fn label_for(&self, index: usize) -> String {
         let pane = &self.panes[index];
         // The pane number leads, so it is the part that survives truncation in
         // a narrow column: it is what Ctrl-A <n> takes, and the name after it
-        // is the reminder. No space after the marker either -- a rule carries
-        // four of these, and padding is space a name cannot use.
+        // is the reminder. The marker points down at the pane being named.
         format!(
-            "{}{marker}{}{}{}",
+            "{} v {}{}{}",
             index + 1,
             pane.title,
             if pane.alert { " !" } else { "" },
@@ -696,17 +700,16 @@ impl Desktop {
     }
 
     /// Write a name onto a rule, clipped to this column. Returns the column
-    /// after the text so the next name can be placed clear of it.
+    /// after the text.
     fn write_label(
         &self,
         canvas: &mut [Vec<char>],
         y: usize,
         x: usize,
         end: usize,
-        marker: char,
         index: usize,
     ) -> usize {
-        let label = self.label_for(index, marker);
+        let label = self.label_for(index);
         let mut column = x;
         for character in label.chars() {
             if column >= end || column >= canvas[y].len() {
@@ -735,7 +738,11 @@ impl Desktop {
             if target >= canvas.len() {
                 break;
             }
-            for (column, character) in line.chars().skip(horizontal_offset).take(width).enumerate()
+            for (column, character) in line
+                .chars()
+                .skip(horizontal_offset)
+                .take(width)
+                .enumerate()
             {
                 let cell = x + column;
                 if cell < canvas[target].len() {
@@ -858,6 +865,28 @@ mod tests {
     }
 
     #[test]
+    fn closed_system_panes_can_be_restored() {
+        let mut desktop = Desktop::new(2);
+        desktop.command(b'4');
+        assert_eq!(desktop.focused_kind(), PaneKind::Resources);
+        desktop.command(b'x');
+        assert!(!desktop
+            .layout()
+            .iter()
+            .any(|(kind, _, _)| *kind == PaneKind::Resources));
+
+        desktop.command(b'S');
+        let layout = desktop.layout();
+        assert_eq!(layout.len(), PaneKind::ALL.len());
+        // Restored at its canonical position, so Ctrl-A 4 still reaches it.
+        desktop.command(b'4');
+        assert_eq!(desktop.focused_kind(), PaneKind::Resources);
+        // Restoring again is a no-op rather than a duplicate.
+        desktop.command(b'S');
+        assert_eq!(desktop.layout().len(), PaneKind::ALL.len());
+    }
+
+    #[test]
     fn a_pane_bounds_a_line_that_never_ends() {
         // A clock printing forever is bounded by the scrollback limit, but a
         // program that emits no newline at all is only bounded by the line cap.
@@ -866,60 +895,68 @@ mod tests {
             desktop.push_channel(0, &[b'x'; 1024]);
         }
         let pane = &desktop.panes[0];
-        assert!(
-            pane.current.len() < MAX_LINE_BYTES,
-            "{}",
-            pane.current.len()
-        );
-        assert!(
-            pane.lines.len() <= DEFAULT_SCROLLBACK,
-            "{}",
-            pane.lines.len()
-        );
+        assert!(pane.current.len() < MAX_LINE_BYTES, "{}", pane.current.len());
+        assert!(pane.lines.len() <= DEFAULT_SCROLLBACK, "{}", pane.lines.len());
     }
 
     #[test]
-    fn shared_rules_name_the_pane_above_and_below_and_follow_focus() {
-        // Every pane is named twice: as the lower name on the rule over it and
-        // the upper name on the rule under it. Both have to track focus, and
-        // the marker has to sit on the focused pane's own name rather than on
-        // whichever name shares its rule.
+    fn each_rule_names_the_panes_beneath_it_once_and_follows_focus() {
+        // A rule names only what is directly under it, so every pane is named
+        // exactly once. Naming both neighbours would repeat each middle pane
+        // on two rules and leave every name half a column to fit in.
         let mut desktop = Desktop::new(4);
         desktop.push_channel(0, b"shell-body\n");
         desktop.push_channel(3, b"resources-body\n");
-        let screen = desktop.render(80, 24);
+        // Strip the cursor-home and clear-to-end controls so a rule is
+        // recognisable by its first character wherever it sits.
+        let plain = |desktop: &Desktop| {
+            desktop.render(80, 24).replace("\x1b[H", "").replace("\x1b[K", "")
+        };
+        let screen = plain(&desktop);
         let rules: Vec<&str> = screen
             .lines()
             .filter(|line| line.starts_with('-'))
             .collect();
 
-        // Four panes in two columns need exactly one rule, between the rows.
-        assert_eq!(rules.len(), 1, "{screen}");
-        assert!(!screen.lines().next().unwrap().starts_with('-'), "{screen}");
+        // Two rows, so two rules: one over each row, none below the last.
+        assert_eq!(rules.len(), 2, "{screen}");
+        assert!(screen.lines().next().unwrap().starts_with('-'), "{screen}");
+        assert!(!screen.lines().last().unwrap().starts_with('-'), "{screen}");
 
-        // Row 0 is named above the rule, row 1 below it, per column.
-        let column = rules[0].find('|').expect("column separator");
-        let (left, right) = rules[0].split_at(column);
-        assert!(
-            left.contains("1^Shell") && left.contains("3vDebugger"),
-            "{left}"
+        let split = |rule: &str| {
+            let column = rule.find('|').expect("column separator");
+            let (left, right) = rule.split_at(column);
+            (left.to_string(), right.to_string())
+        };
+        let (top_left, top_right) = split(rules[0]);
+        let (low_left, low_right) = split(rules[1]);
+        assert!(top_left.contains("1 v Shell"), "{top_left}");
+        assert!(top_right.contains("2 v Application"), "{top_right}");
+        assert!(low_left.contains("3 v Debugger"), "{low_left}");
+        assert!(low_right.contains("4 v mon"), "{low_right}");
+
+        // No name appears twice anywhere on the screen's rules.
+        for name in ["Shell", "Application", "Debugger", "mon"] {
+            let seen: usize = rules.iter().map(|rule| rule.matches(name).count()).sum();
+            assert_eq!(seen, 1, "{name} named {seen} times");
+        }
+
+        // The marker sits on the focused pane's own name, and only there.
+        assert!(top_left.contains("1 v Shell *"), "{top_left}");
+        assert_eq!(
+            rules.iter().map(|rule| rule.matches('*').count()).sum::<usize>(),
+            1,
+            "{screen}"
         );
-        assert!(
-            right.contains("2^Application") && right.contains("4vResources"),
-            "{right}"
-        );
 
-        // The marker is on Shell, which has focus, and nowhere else.
-        assert!(left.contains("1^Shell *"), "{left}");
-        assert_eq!(rules[0].matches('*').count(), 1, "{}", rules[0]);
-
-        // Focusing a pane in the lower row moves the marker to its own name.
         desktop.command(b'4');
-        let screen = desktop.render(80, 24);
-        let rule = screen.lines().find(|line| line.starts_with('-')).unwrap();
-        assert!(rule.contains("4vResources *"), "{rule}");
-        assert!(!rule.contains("1^Shell *"), "{rule}");
-        assert_eq!(rule.matches('*').count(), 1, "{rule}");
+        let screen = plain(&desktop);
+        let rules: Vec<&str> = screen
+            .lines()
+            .filter(|line| line.starts_with('-'))
+            .collect();
+        assert!(rules[1].contains("4 v mon *"), "{}", rules[1]);
+        assert!(!rules[0].contains("1 v Shell *"), "{}", rules[0]);
     }
 
     #[test]
@@ -934,7 +971,7 @@ mod tests {
         assert!(large.contains("application"));
         let small = desktop.render(40, 12);
         assert!(small.contains("Shell *"));
-        assert!(small.contains("Resources"));
+        assert!(small.contains("mon"));
     }
 
     #[test]

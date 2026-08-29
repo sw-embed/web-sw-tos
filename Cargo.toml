@@ -21,7 +21,8 @@ cor24-isa = { path = "../sw-cor24-isa", features = ["serde"] }
 yew = { version = "0.21", features = ["csr"] }
 wasm-bindgen = "0.2"
 js-sys = "0.3"
-gloo = "0.11"
+gloo = { version = "0.11", features = ["net"] }
+wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
 
 [dependencies.web-sys]

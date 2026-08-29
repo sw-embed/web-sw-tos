@@ -6,7 +6,7 @@
 //! which is exactly what "help does nothing" looks like.
 
 use crate::transport;
-use swtos_frontend::debug::{DebugConsole, identity_request};
+use swtos_frontend::debug::{DebugConsole, DebugMap, identity_request};
 use swtos_frontend::ui::{Desktop, PaneKind};
 use swtos_host::uart::VirtualUart;
 
@@ -80,6 +80,26 @@ impl Console {
                 None
             }
             _ => None,
+        }
+    }
+
+    /// Install the debug map fetched at runtime, enabling `sym`, `list`,
+    /// and `dis`.
+    ///
+    /// The map is 1.6 MB and is deliberately not compiled into the WASM
+    /// bundle, where it would dwarf the module and be re-committed to
+    /// `pages/` on every rebuild. Fetched same-origin instead, so the demo
+    /// stays entirely client-side.
+    pub fn load_map(&mut self, desktop: &mut Desktop, json: &str) {
+        match DebugMap::from_json(json) {
+            Ok(map) => {
+                let build = map.build_id.clone();
+                self.console.map = Some(map);
+                desktop.push_channel(CHANNEL, format!("debug map loaded: {build}\n").as_bytes());
+            }
+            Err(error) => {
+                desktop.push_channel(CHANNEL, format!("debug map: {error}\n").as_bytes());
+            }
         }
     }
 

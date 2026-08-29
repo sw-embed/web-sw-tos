@@ -133,6 +133,46 @@ pub fn transmit(uart: &mut VirtualUart, decoder: &ConnectionDecoder, channel: u8
     uart.send(bytes, HEARTBEAT_BYTE_CYCLES);
 }
 
+/// Send the periodic time tick SWTOS's clock consumers run on.
+///
+/// UPTIME and WALL_CLOCK carry a three-byte little-endian centisecond value
+/// on channel zero. Without them Uptime reads a tick that never arrives and
+/// counts erratically, and `mon` -- which refreshes on the uptime tick rather
+/// than spinning -- never reports at all.
+///
+/// Uptime is derived from the scheduler tick, not the wall clock: one tick is
+/// one centisecond by construction, so the figure stays consistent with the
+/// heartbeat the target actually receives, even though emulated time runs
+/// slower than real time. Wall clock is real, being centiseconds since local
+/// midnight.
+pub fn time_ticks(uart: &mut VirtualUart, desktop: &mut Desktop, tick: u32) {
+    // The status line's clock is the frontend's own, and was never being set:
+    // it read `--:--:--` for the life of every session.
+    let now = js_sys::Date::new_0();
+    desktop.set_clock(format!(
+        "{:02}:{:02}:{:02}",
+        now.get_hours(),
+        now.get_minutes(),
+        now.get_seconds()
+    ));
+    let wall_centiseconds = (f64::from(now.get_hours()) * 360_000.0
+        + f64::from(now.get_minutes()) * 6_000.0
+        + f64::from(now.get_seconds()) * 100.0) as u32;
+    for (kind, value) in [
+        (FrameType::Uptime, tick),
+        (FrameType::WallClock, wall_centiseconds),
+    ] {
+        let frame = Frame {
+            kind,
+            channel: 0,
+            payload: vec![value as u8, (value >> 8) as u8, (value >> 16) as u8],
+        };
+        if let Ok(encoded) = frame.encode() {
+            uart.send(&encoded, FRAME_BYTE_CYCLES);
+        }
+    }
+}
+
 /// Re-offer HELLO while still unnegotiated. The target is not listening during
 /// early boot, so one attempt at startup is not enough.
 pub fn negotiate(uart: &mut VirtualUart, decoder: &ConnectionDecoder) {

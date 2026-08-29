@@ -40,6 +40,10 @@ pub struct Status {
     pub prefix_armed: bool,
 }
 
+/// Ticks between time frames. The consumers display centiseconds as seconds,
+/// so four a second is plenty and keeps frame traffic off the critical path.
+const TIME_TICK_INTERVAL: u32 = 25;
+
 /// Ticks between HELLO attempts while still in plain mode. The target is not
 /// listening during early boot, so a single HELLO at startup is not enough;
 /// the CLI retries every 250 ms and this is the same cadence at 100 Hz.
@@ -99,6 +103,11 @@ impl Session {
         self.desktop.render_grid(cols, rows)
     }
 
+    /// Install the runtime-fetched debug map.
+    pub fn load_map(&mut self, json: &str) {
+        self.console.load_map(&mut self.desktop, json);
+    }
+
     /// Everything the status line reports. `log_entries` is the emulator's
     /// UART log, which grows without bound and has no public clear.
     pub fn status(&self) -> Status {
@@ -139,7 +148,7 @@ impl Session {
         let channel = self.desktop.focused_channel();
         self.desktop
             .push_channel(channel, &keys::echo_bytes(&bytes));
-        self.send(&bytes);
+        transport::transmit(&mut self.uart, &self.decoder, channel, &bytes);
         bytes
     }
 
@@ -153,15 +162,20 @@ impl Session {
             return Vec::new();
         }
         if key == "e" {
-            self.send(&[0x1b]);
+            let channel = self.desktop.focused_channel();
+            transport::transmit(&mut self.uart, &self.decoder, channel, &[0x1b]);
             return vec![0x1b];
         }
         self.desktop.command(keys::command_byte(key));
         Vec::new()
     }
 
-    /// Offer HELLO until framed, then greet in the Debugger pane once.
+    /// Offer HELLO until framed, then greet in the Debugger pane once, and
+    /// keep the clock consumers fed.
     fn negotiate(&mut self) {
+        if self.decoder.mode() == Mode::Framed && self.tick.is_multiple_of(TIME_TICK_INTERVAL) {
+            transport::time_ticks(&mut self.uart, &mut self.desktop, self.tick);
+        }
         if self.tick >= self.next_hello {
             transport::negotiate(&mut self.uart, &self.decoder);
             self.next_hello = self.tick.wrapping_add(HELLO_RETRY_TICKS);
@@ -172,11 +186,5 @@ impl Session {
             let request = self.console.greet(&mut self.desktop);
             transport::request(&mut self.uart, request);
         }
-    }
-
-    /// Queue bytes for the target on the focused channel.
-    fn send(&mut self, bytes: &[u8]) {
-        let channel = self.desktop.focused_channel();
-        transport::transmit(&mut self.uart, &self.decoder, channel, bytes);
     }
 }

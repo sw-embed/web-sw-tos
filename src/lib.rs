@@ -30,6 +30,7 @@ const MAX_CATCHUP: u32 = 20;
 
 pub enum Msg {
     Tick,
+    MapLoaded(String),
     Resize,
     Key(String, bool),
     Geometry(usize),
@@ -78,6 +79,19 @@ impl Component for App {
             event.prevent_default();
             keys.send_message(Msg::Key(event.key(), event.ctrl_key()));
         });
+        // The debug map is fetched rather than compiled in: at 1.6 MB it
+        // would dwarf the WASM module and be re-committed to pages/ on every
+        // rebuild. Same-origin, so the demo stays fully client-side.
+        let loader = ctx.link().clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            if let Ok(response) = gloo::net::http::Request::get("program.debug.json")
+                .send()
+                .await
+                && let Ok(text) = response.text().await
+            {
+                loader.send_message(Msg::MapLoaded(text));
+            }
+        });
         let sizer = ctx.link().clone();
         let resize = EventListener::new(&gloo::utils::window(), "resize", move |_| {
             sizer.send_message(Msg::Resize);
@@ -119,6 +133,7 @@ impl Component for App {
             }
             Msg::Geometry(index) => self.geometry = index.min(chrome::GEOMETRIES.len() - 1),
             Msg::Resize => self.fit = chrome::fit(),
+            Msg::MapLoaded(json) => self.session.load_map(&json),
         }
         true
     }
