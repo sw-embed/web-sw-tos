@@ -1,9 +1,10 @@
 number = 15
 slug = "revendor-sw-tos"
-status = "in-progress"
+status = "completed"
 description = "Re-vendor from sw-tos d6dbce9. Sixteen commits landed since the last vendorin..."
 role = "production"
 context_files = []
 created_at = "2026-08-28T21:58:29"
+completed_at = "2026-08-28T22:07:32"
 task_type = "vendoring"
-commits = []
+commits = ["0e180fde8b6f5ff9158367e2292a1d089721d435"]

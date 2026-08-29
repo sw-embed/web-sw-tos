@@ -1,0 +1,11 @@
+{
+  "task_type": "vendoring",
+  "state": {
+    "number": 15,
+    "step": "revendor-sw-tos"
+  },
+  "action": "Checked protocol.rs and docs/protocol.md were unchanged before assuming the wire format held; swept payload sizes 1..64 to locate the bound empirically; adopted upstream's BoxSpec over the local Rect rather than reconciling them.",
+  "result": "success",
+  "reward": 1,
+  "timestamp": "2026-08-28T22:07:32"
+}
