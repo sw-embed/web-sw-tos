@@ -114,29 +114,46 @@ trailer naming the files and the reason.
 
 Every local change to a vendored file, so re-vendoring is mechanical rather
 than archaeological. Re-vendor by copying upstream fresh, then walking this
-table: **required** patches must be re-applied, **clippy** patches should be
-checked first and dropped if upstream has since fixed them.
+table.
 
-`sw-tos` has been asked to run clippy on `te-rs`, so the clippy rows below are
-expected to become redundant. When they do, take upstream's fix and delete the
-row -- do not preserve a local patch just because it exists. Upstream may well
-resolve these differently (`draw_box` in particular), and upstream's shape wins
-on anything cosmetic.
+Current vendoring: **sw-tos d6dbce9**.
 
 | File | Kind | Change |
 |---|---|---|
 | `resource.rs` | required | `Instant` -> `Millis` (`f64`), caller-supplied. `Instant::now()` panics on wasm32. |
 | `debug.rs` | required | `load(path)` -> `from_json(contents)`. No filesystem in a browser. |
-| `ui.rs` | required | Renders `Vec<Vec<Cell>>` via `render_grid`, not an ANSI `String`. Body is height-1 rows. Adds `Cell`, `Color`, `Attrs`, `status_row`. |
-| `ui.rs` | test | Test helper flattens the grid to text so upstream assertions run unchanged. |
-| `debug.rs` | clippy | Collapsed a nested `if` into the `let`-chain above it. |
-| `ui.rs` | clippy | `draw_box` geometry bundled into `Rect` (was 9 arguments). |
-| `ui.rs` | clippy | Box edges drawn via `horizontal_edge` and row iteration, not range indexing. |
-| all four | trace | Provenance header naming source repo, path, commit, and date. |
+| `ui.rs` | required | Adds `Cell`, `Color`, `Attrs`, and a `render_grid` **adapter** over upstream's `render`. |
+| all three | trace | Provenance header naming source repo, path, commit, and date. |
 
-The required rows are not negotiable and will survive any upstream change:
-they exist because a browser has no filesystem, no `Instant`, and no terminal
-to emit escapes at.
+`protocol.rs` is vendored unmodified and was unchanged upstream across this
+cycle; it needs no patch at all.
+
+### What the last re-vendor taught
+
+The three clippy patches this table used to carry are **gone**, exactly as
+planned: upstream cleared its own clippy findings in `71ff551`, including
+`too_many_arguments` on `draw_box`, which it solved with a `BoxSpec` struct
+rather than the `Rect` used here. Upstream's shape won, the local patches were
+deleted rather than reconciled, and nothing was kept alive merely because it
+existed.
+
+The `ui.rs` patch changed character, and this is the durable lesson. It began
+as an invasive conversion of every canvas write from `char` to `Cell`. Upstream
+then grew `ui.rs` by 375 lines in one cycle -- new separators, borders removed,
+sixteen slots -- and that patch would have had to be redone by hand against
+substantially rewritten code. It is now a thin adapter: `render_grid` calls
+upstream's `render` and strips the three escapes it emits (`\x1b[H`, a
+per-line `\x1b[K`, `\r\n`). The adapter survived the rewrite untouched, and
+picked up the new pane chrome for free.
+
+The rule that follows: **adapt at the boundary, do not rewrite the interior.**
+A patch that touches one function survives upstream churn; a patch spread
+across a module does not. The same reasoning is why the vendored tests now run
+completely unmodified -- upstream's `render` is left intact, so its own
+assertions still exercise it.
+
+When colour arrives it enters as SGR in pane content, and `render_grid` is the
+one place that has to learn to parse it.
 
 ## What is vendored, and from where
 

@@ -57,7 +57,9 @@ impl Console {
                     );
                     self.awaiting = 0;
                 }
-                let result = self.console.command(&self.input);
+                // No live snapshot yet: the Resources pane is a later step, so
+                // the `map` command reports what it can without one.
+                let result = self.console.command(&self.input, None);
                 self.input.clear();
                 for line in result.lines {
                     desktop.push_channel(CHANNEL, format!("{line}\n").as_bytes());

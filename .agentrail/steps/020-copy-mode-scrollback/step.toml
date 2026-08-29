@@ -1,4 +1,4 @@
-number = 19
+number = 20
 slug = "copy-mode-scrollback"
 status = "pending"
 description = "Ctrl-A y, arrows/hjkl, PgUp/PgDn, g/G, q."

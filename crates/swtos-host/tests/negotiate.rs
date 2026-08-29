@@ -277,9 +277,11 @@ fn oversized_tty_input_frames_are_dropped_by_the_target() {
         out
     }
 
-    assert!(run(16).contains("READY"), "split input failed to spawn");
+    // The boundary is sharp and was measured, not assumed: 16 accepted,
+    // 17 dropped, re-confirmed against the sixteen-slot image.
+    assert!(run(16).contains("READY"), "a 16-byte payload was refused");
     assert!(
-        !run(64).contains("READY"),
-        "a 22-byte frame was accepted; the 16-byte bound this guards has changed"
+        !run(17).contains("READY"),
+        "a 17-byte payload was accepted; the target's bound has grown"
     );
 }

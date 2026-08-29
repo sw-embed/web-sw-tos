@@ -3,8 +3,8 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/ui.rs
-//!   source commit: 9fed3b7
-//!   vendored:      2026-08-28
+//!   source commit: d6dbce9
+//!   vendored:      2026-08-28 (re-vendored)
 //!
 //! Adapted: renders into a `Cell` grid rather than an ANSI string, and
 //! the body is height-1 rows so the grid exactly fills the browser's fixed
@@ -13,15 +13,12 @@
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
-pub const DEFAULT_SCROLLBACK: usize = 1_000;
-
 /// One character cell of the rendered screen.
 ///
-/// Upstream renders straight to a `String` of ANSI escapes for a real
-/// terminal. The browser paints cells instead, and carries colour and
-/// attributes from the start even though nothing sets them yet: returning
-/// `char` would force both this API and the renderer to be rewritten when
-/// colour arrives. See the ANSI section of `docs/plan.md`.
+/// Colour and attributes are carried from the start even though nothing sets
+/// them yet: returning `char` would force both this API and the browser
+/// renderer to be rewritten when colour arrives. See the ANSI section of
+/// `docs/plan.md`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cell {
     pub ch: char,
@@ -64,6 +61,17 @@ pub struct Attrs {
     pub bold: bool,
     pub reverse: bool,
 }
+
+pub const DEFAULT_SCROLLBACK: usize = 1_000;
+
+/// Longest line a pane will accumulate before breaking it.
+///
+/// Completed lines are capped by the scrollback limit, but the line still
+/// being assembled is not: a program that emits bytes and never a newline
+/// would grow one pane without bound. Breaking the line keeps the output and
+/// puts it under the scrollback limit, which is what a terminal does when it
+/// wraps.
+pub const MAX_LINE_BYTES: usize = 4_096;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -141,6 +149,9 @@ impl Pane {
                 }
                 0x20..=0x7e => self.current.push(char::from(byte)),
                 _ => self.current.push('�'),
+            }
+            if self.current.len() >= MAX_LINE_BYTES {
+                self.finish_line();
             }
         }
     }
@@ -445,57 +456,72 @@ impl Desktop {
         CommandOutcome::Continue
     }
 
-    /// Render the whole screen as a grid of exactly `height` rows by `width`
-    /// cells, the last row being the status line.
+    /// The screen as a grid of exactly `height` rows of `width` cells.
     ///
-    /// Upstream returns a `String` carrying `\x1b[H`, a per-line `\x1b[K`, and
-    /// `\r\n`, which exist to drive a real terminal. The browser paints cells,
-    /// so it never has to parse those. Upstream also reserves two rows for the
-    /// body and emits `height - 1` rows in total, avoiding a scroll when a
-    /// terminal's last cell is written; a fixed character screen has no such
-    /// constraint, so the body takes `height - 1` and the grid exactly fills.
+    /// Adapts upstream's `render`, which returns a `String` carrying
+    /// `\x1b[H`, a per-line `\x1b[K`, and `\r\n` to drive a real terminal.
+    /// Stripping those three back out is deliberately preferred over
+    /// converting every canvas write to cells: `ui.rs` grew 375 lines in a
+    /// single upstream cycle, and an adapter survives that untouched while an
+    /// invasive conversion must be redone by hand each time.
+    ///
+    /// When colour arrives it enters through the pane content as SGR, which
+    /// this is the one place to parse -- the three escapes above are terminal
+    /// chrome and never reach the browser.
     pub fn render_grid(&self, width: usize, height: usize) -> Vec<Vec<Cell>> {
+        let text = self.render(width, height).replace("\x1b[H", "");
+        let mut rows: Vec<Vec<Cell>> = text
+            .split("\r\n")
+            .map(|line| {
+                let mut row: Vec<Cell> =
+                    line.replace("\x1b[K", "").chars().map(Cell::new).collect();
+                row.resize(width, Cell::default());
+                row.truncate(width);
+                row
+            })
+            .collect();
+        rows.resize(height, vec![Cell::default(); width]);
+        rows.truncate(height);
+        rows
+    }
+
+    pub fn render(&self, width: usize, height: usize) -> String {
         let width = width.max(24);
         let height = height.max(8);
-        let body_height = height.saturating_sub(1);
-        let mut canvas = vec![vec![Cell::default(); width]; body_height];
+        let body_height = height.saturating_sub(2);
+        let mut canvas = vec![vec![' '; width]; body_height];
 
         if self.help {
             draw_box(
                 &mut canvas,
-                Rect {
+                BoxSpec {
                     x: 0,
                     y: 0,
                     width,
                     height: body_height,
+                    title: "Help",
+                    lines: &[
+                        "1-9 focus  n next  p previous  z zoom  s split  x close",
+                        "y copy  b,b broadcast  w save  R restore-layout",
+                        "copy: arrows/hjkl  PgUp/PgDn  g/G  q exit",
+                        "r reconnect/redraw  e target-Escape  ? help  d detach",
+                        "close help: q, Escape, or ?",
+                    ],
+                    horizontal_offset: 0,
+                    focused: true,
                 },
-                "Help",
-                &[
-                    "1-9 focus  n next  p previous  z zoom  s split  x close",
-                    "y copy  b,b broadcast  w save  R restore-layout",
-                    "copy: arrows/hjkl  PgUp/PgDn  g/G  q exit",
-                    "r reconnect/redraw  e target-Escape  ? help  d detach",
-                    "close help: q, Escape, or ?",
-                ],
-                0,
-                true,
             );
         } else if self.zoomed {
             self.draw_pane(&mut canvas, self.focus, 0, 0, width, body_height);
         } else {
-            let columns = if self.panes.len() <= 1 { 1 } else { 2 };
-            let rows = self.panes.len().div_ceil(columns);
-            for index in 0..self.panes.len() {
-                let column = index % columns;
-                let row = index / columns;
-                let x = column * width / columns;
-                let next_x = (column + 1) * width / columns;
-                let y = row * body_height / rows;
-                let next_y = (row + 1) * body_height / rows;
-                self.draw_pane(&mut canvas, index, x, y, next_x - x, next_y - y);
-            }
+            self.draw_grid(&mut canvas, width, body_height);
         }
 
+        let mut output = String::from("\x1b[H");
+        for row in canvas {
+            output.extend(row);
+            output.push_str("\x1b[K\r\n");
+        }
         let error = self.error.as_deref().unwrap_or("ok");
         let status = format!(
             " focus:{}  panes:{}{}{}  {}  clock:{}  {}",
@@ -517,13 +543,199 @@ impl Desktop {
             self.clock,
             error
         );
-        canvas.push(status_row(&truncate(&status, width), width));
-        canvas
+        output.push_str(&truncate(&status, width));
+        output.push_str("\x1b[K\r\n");
+        output
+    }
+}
+
+/// The tiling: how many rows and columns, and the width left for panes once
+/// the column rules are taken out.
+struct Grid {
+    width: usize,
+    columns: usize,
+    column_total: usize,
+    rows: usize,
+}
+
+impl Desktop {
+    /// Tile the panes, sharing every edge.
+    ///
+    /// Boxing each pane separately spends two lines per row on borders and a
+    /// column on each outer edge, which at nine rows costs half the display.
+    /// Panes here share one rule per row and one rule per column boundary, and
+    /// there is no outer frame at all. A rule names the pane above it and the
+    /// pane below it in each column, so the titles cost no extra lines:
+    ///
+    ///   -- ^ Shell ------- v Debugger ---|-- ^ TTY 2 ------ v TTY 3 -------
+    fn draw_grid(&self, canvas: &mut [Vec<char>], width: usize, height: usize) {
+        let columns = if self.panes.len() <= 1 { 1 } else { 2 };
+        let grid = Grid {
+            width,
+            columns,
+            column_total: width.saturating_sub(columns - 1),
+            rows: self.panes.len().div_ceil(columns),
+        };
+        if grid.rows == 0 || height <= grid.rows {
+            return;
+        }
+
+        // Rules sit between rows only. The top line is content, not a border,
+        // and the footer closes the bottom; a single row still needs one rule
+        // to carry its names, so it gets one beneath it.
+        let rules = if grid.rows == 1 { 1 } else { grid.rows - 1 };
+        if height <= rules {
+            return;
+        }
+        let content_total = height - rules;
+
+        let mut y = 0;
+        for row in 0..grid.rows {
+            let content_height =
+                (row + 1) * content_total / grid.rows - row * content_total / grid.rows;
+            let mut x = 0;
+            for column in 0..columns {
+                let pane_width = (column + 1) * grid.column_total / columns
+                    - column * grid.column_total / columns;
+                if let Some(index) = row.checked_mul(columns).map(|base| base + column)
+                    && index < self.panes.len()
+                {
+                    self.draw_pane_content(canvas, index, x, y, pane_width, content_height);
+                }
+                x += pane_width;
+                if column + 1 < columns {
+                    for line in y..(y + content_height).min(canvas.len()) {
+                        if x < canvas[line].len() {
+                            canvas[line][x] = '|';
+                        }
+                    }
+                    x += 1;
+                }
+            }
+            y += content_height;
+            if row + 1 < grid.rows || grid.rows == 1 {
+                self.draw_rule(canvas, y, &grid, row);
+                y += 1;
+            }
+        }
+    }
+
+    /// Draw one horizontal rule, naming the pane above and below per column.
+    fn draw_rule(&self, canvas: &mut [Vec<char>], y: usize, grid: &Grid, row: usize) {
+        if y >= canvas.len() {
+            return;
+        }
+        for cell in canvas[y].iter_mut().take(grid.width) {
+            *cell = '-';
+        }
+        let columns = grid.columns;
+        let mut x = 0;
+        for column in 0..columns {
+            let pane_width =
+                (column + 1) * grid.column_total / columns - column * grid.column_total / columns;
+            let end = x + pane_width;
+            let above = Some(row * columns + column).filter(|index| *index < self.panes.len());
+            let below = Some((row + 1) * columns + column)
+                .filter(|index| *index < self.panes.len() && row + 1 < grid.rows);
+            // Lay the two names out from what they need rather than by
+            // splitting the column in half: the lower name sits at the middle
+            // when both fit comfortably, and slides right only as far as a long
+            // upper name pushes it. A fixed midpoint clips a long upper name on
+            // a narrow terminal while leaving dashes to the right of a short
+            // lower one.
+            let above_span = above.map_or(0, |index| self.label_for(index, '^').chars().count());
+            let below_span = below.map_or(0, |index| self.label_for(index, 'v').chars().count());
+            let lead = usize::from(above_span + below_span + 2 <= pane_width) * 2;
+            let mut limit = end;
+            if let Some(index) = below {
+                let start = (x + pane_width / 2)
+                    .max(x + lead + above_span)
+                    .min(end.saturating_sub(below_span))
+                    .max(x);
+                self.write_label(canvas, y, start, end, 'v', index);
+                limit = start;
+            }
+            if let Some(index) = above {
+                self.write_label(canvas, y, x + lead, limit, '^', index);
+            }
+            x += pane_width;
+            if column + 1 < columns {
+                if x < canvas[y].len() {
+                    canvas[y][x] = '|';
+                }
+                x += 1;
+            }
+        }
+    }
+
+    fn label_for(&self, index: usize, marker: char) -> String {
+        let pane = &self.panes[index];
+        // The pane number leads, so it is the part that survives truncation in
+        // a narrow column: it is what Ctrl-A <n> takes, and the name after it
+        // is the reminder. No space after the marker either -- a rule carries
+        // four of these, and padding is space a name cannot use.
+        format!(
+            "{}{marker}{}{}{}",
+            index + 1,
+            pane.title,
+            if pane.alert { " !" } else { "" },
+            if index == self.focus { " *" } else { "" }
+        )
+    }
+
+    /// Write a name onto a rule, clipped to this column. Returns the column
+    /// after the text so the next name can be placed clear of it.
+    fn write_label(
+        &self,
+        canvas: &mut [Vec<char>],
+        y: usize,
+        x: usize,
+        end: usize,
+        marker: char,
+        index: usize,
+    ) -> usize {
+        let label = self.label_for(index, marker);
+        let mut column = x;
+        for character in label.chars() {
+            if column >= end || column >= canvas[y].len() {
+                break;
+            }
+            canvas[y][column] = character;
+            column += 1;
+        }
+        column
+    }
+
+    /// Pane contents, with no border of its own.
+    fn draw_pane_content(
+        &self,
+        canvas: &mut [Vec<char>],
+        index: usize,
+        x: usize,
+        y: usize,
+        width: usize,
+        height: usize,
+    ) {
+        let lines = self.panes[index].visible_lines(height);
+        let horizontal_offset = self.panes[index].horizontal_offset;
+        for (row, line) in lines.iter().take(height).enumerate() {
+            let target = y + row;
+            if target >= canvas.len() {
+                break;
+            }
+            for (column, character) in line.chars().skip(horizontal_offset).take(width).enumerate()
+            {
+                let cell = x + column;
+                if cell < canvas[target].len() {
+                    canvas[target][cell] = character;
+                }
+            }
+        }
     }
 
     fn draw_pane(
         &self,
-        canvas: &mut [Vec<Cell>],
+        canvas: &mut [Vec<char>],
         index: usize,
         x: usize,
         y: usize,
@@ -533,88 +745,72 @@ impl Desktop {
         let content_height = height.saturating_sub(2);
         let lines = self.panes[index].visible_lines(content_height);
         let horizontal_offset = self.panes[index].horizontal_offset;
+        let title = format!(
+            "{}{}",
+            self.panes[index].title,
+            if self.panes[index].alert { " !" } else { "" }
+        );
         draw_box(
             canvas,
-            Rect {
+            BoxSpec {
                 x,
                 y,
                 width,
                 height,
+                title: &title,
+                lines: &lines,
+                horizontal_offset,
+                focused: index == self.focus,
             },
-            &format!(
-                "{}{}",
-                self.panes[index].title,
-                if self.panes[index].alert { " !" } else { "" }
-            ),
-            &lines,
-            horizontal_offset,
-            index == self.focus,
         );
     }
 }
 
-/// The top or bottom edge of a box, corners included. Split out of `draw_box`
-/// so each edge iterates its own row: upstream indexes two rows inside one
-/// range loop, which clippy rejects as a needless range loop.
-fn horizontal_edge(row: &mut [Cell], x: usize, right: usize) {
-    for (column, cell) in row.iter_mut().enumerate().take(right + 1).skip(x) {
-        *cell = Cell::new(if column == x || column == right {
-            '+'
-        } else {
-            '-'
-        });
-    }
-}
-
-/// Where a box sits on the canvas. Upstream passes x, y, width, and height
-/// as four separate arguments, which puts `draw_box` at nine and trips
-/// clippy's `too_many_arguments`. Bundling them is the fix that does not
-/// require suppressing the lint.
-#[derive(Clone, Copy, Debug)]
-struct Rect {
+/// Where a box goes and what it holds.
+struct BoxSpec<'a> {
     x: usize,
     y: usize,
     width: usize,
     height: usize,
-}
-
-/// One full-width row of cells from `text`, space padded.
-fn status_row(text: &str, width: usize) -> Vec<Cell> {
-    let mut row = vec![Cell::default(); width];
-    for (column, character) in text.chars().take(width).enumerate() {
-        row[column] = Cell::new(character);
-    }
-    row
-}
-
-fn draw_box(
-    canvas: &mut [Vec<Cell>],
-    rect: Rect,
-    title: &str,
-    lines: &[&str],
+    title: &'a str,
+    lines: &'a [&'a str],
     horizontal_offset: usize,
     focused: bool,
-) {
-    let Rect {
+}
+
+fn draw_box(canvas: &mut [Vec<char>], spec: BoxSpec<'_>) {
+    let BoxSpec {
         x,
         y,
         width,
         height,
-    } = rect;
+        title,
+        lines,
+        horizontal_offset,
+        focused,
+    } = spec;
     if width < 2 || height < 2 || y >= canvas.len() {
         return;
     }
     let right = (x + width - 1).min(canvas[0].len() - 1);
     let bottom = (y + height - 1).min(canvas.len() - 1);
-    horizontal_edge(&mut canvas[y], x, right);
-    horizontal_edge(&mut canvas[bottom], x, right);
+    // The top and bottom edges are identical, so build the run once and copy
+    // it into both rows. This also keeps working when the box is clamped flat
+    // and the two edges are the same row.
+    let mut edge = vec!['-'; right + 1 - x];
+    edge[0] = '+';
+    if let Some(last) = edge.last_mut() {
+        *last = '+';
+    }
+    canvas[y][x..=right].copy_from_slice(&edge);
+    canvas[bottom][x..=right].copy_from_slice(&edge);
     for row in canvas.iter_mut().take(bottom).skip(y + 1) {
-        row[x] = Cell::new('|');
-        row[right] = Cell::new('|');
+        row[x] = '|';
+        row[right] = '|';
     }
     let label = format!(" {}{} ", title, if focused { " *" } else { "" });
     for (offset, character) in label.chars().take(width.saturating_sub(2)).enumerate() {
-        canvas[y][x + 1 + offset] = Cell::new(character);
+        canvas[y][x + 1 + offset] = character;
     }
     for (row, line) in lines.iter().take(bottom.saturating_sub(y + 1)).enumerate() {
         for (column, character) in line
@@ -623,7 +819,7 @@ fn draw_box(
             .take(width.saturating_sub(2))
             .enumerate()
         {
-            canvas[y + 1 + row][x + 1 + column] = Cell::new(character);
+            canvas[y + 1 + row][x + 1 + column] = character;
         }
     }
 }
@@ -634,18 +830,6 @@ fn truncate(value: &str, width: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    /// Flatten the cell grid to text so the vendored assertions below keep
-    /// working unchanged. Upstream's `render` returned a `String` directly;
-    /// only the shape changed, not what these tests are checking.
-    fn rendered(desktop: &Desktop, width: usize, height: usize) -> String {
-        desktop
-            .render_grid(width, height)
-            .into_iter()
-            .map(|row| row.into_iter().map(|cell| cell.ch).collect::<String>())
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
     use super::*;
 
     #[test]
@@ -662,16 +846,81 @@ mod tests {
     }
 
     #[test]
+    fn a_pane_bounds_a_line_that_never_ends() {
+        // A clock printing forever is bounded by the scrollback limit, but a
+        // program that emits no newline at all is only bounded by the line cap.
+        let mut desktop = Desktop::new(1);
+        for _ in 0..(MAX_LINE_BYTES * DEFAULT_SCROLLBACK * 2 / 1024) {
+            desktop.push_channel(0, &[b'x'; 1024]);
+        }
+        let pane = &desktop.panes[0];
+        assert!(
+            pane.current.len() < MAX_LINE_BYTES,
+            "{}",
+            pane.current.len()
+        );
+        assert!(
+            pane.lines.len() <= DEFAULT_SCROLLBACK,
+            "{}",
+            pane.lines.len()
+        );
+    }
+
+    #[test]
+    fn shared_rules_name_the_pane_above_and_below_and_follow_focus() {
+        // Every pane is named twice: as the lower name on the rule over it and
+        // the upper name on the rule under it. Both have to track focus, and
+        // the marker has to sit on the focused pane's own name rather than on
+        // whichever name shares its rule.
+        let mut desktop = Desktop::new(4);
+        desktop.push_channel(0, b"shell-body\n");
+        desktop.push_channel(3, b"resources-body\n");
+        let screen = desktop.render(80, 24);
+        let rules: Vec<&str> = screen
+            .lines()
+            .filter(|line| line.starts_with('-'))
+            .collect();
+
+        // Four panes in two columns need exactly one rule, between the rows.
+        assert_eq!(rules.len(), 1, "{screen}");
+        assert!(!screen.lines().next().unwrap().starts_with('-'), "{screen}");
+
+        // Row 0 is named above the rule, row 1 below it, per column.
+        let column = rules[0].find('|').expect("column separator");
+        let (left, right) = rules[0].split_at(column);
+        assert!(
+            left.contains("1^Shell") && left.contains("3vDebugger"),
+            "{left}"
+        );
+        assert!(
+            right.contains("2^Application") && right.contains("4vResources"),
+            "{right}"
+        );
+
+        // The marker is on Shell, which has focus, and nowhere else.
+        assert!(left.contains("1^Shell *"), "{left}");
+        assert_eq!(rules[0].matches('*').count(), 1, "{}", rules[0]);
+
+        // Focusing a pane in the lower row moves the marker to its own name.
+        desktop.command(b'4');
+        let screen = desktop.render(80, 24);
+        let rule = screen.lines().find(|line| line.starts_with('-')).unwrap();
+        assert!(rule.contains("4vResources *"), "{rule}");
+        assert!(!rule.contains("1^Shell *"), "{rule}");
+        assert_eq!(rule.matches('*').count(), 1, "{rule}");
+    }
+
+    #[test]
     fn panes_keep_independent_bounded_scrollback_and_resize() {
         let mut desktop = Desktop::new(2);
         desktop.push_channel(0, b"old\nmiddle\nshell\ntail");
         desktop.push_channel(1, b"application\n");
-        let large = rendered(&desktop, 80, 24);
+        let large = desktop.render(80, 24);
         assert!(!large.contains("old"));
         assert!(large.contains("shell"));
         assert!(large.contains("tail"));
         assert!(large.contains("application"));
-        let small = rendered(&desktop, 40, 12);
+        let small = desktop.render(40, 12);
         assert!(small.contains("Shell *"));
         assert!(small.contains("Resources"));
     }
@@ -680,15 +929,15 @@ mod tests {
     fn zoom_and_help_replace_the_grid() {
         let mut desktop = Desktop::default();
         desktop.command(b'z');
-        let zoomed = rendered(&desktop, 60, 16);
+        let zoomed = desktop.render(60, 16);
         assert!(zoomed.contains("Shell *"));
         assert!(!zoomed.contains("Application"));
         desktop.command(b'?');
-        let help = rendered(&desktop, 60, 16);
+        let help = desktop.render(60, 16);
         assert!(help.contains("1-9 focus"));
         desktop.command(b'q');
         assert!(!desktop.help_enabled());
-        assert!(rendered(&desktop, 60, 16).contains("Shell *"));
+        assert!(desktop.render(60, 16).contains("Shell *"));
     }
 
     #[test]
@@ -709,7 +958,7 @@ mod tests {
         assert_eq!(desktop.pane_count(), 5);
         desktop.command(b'1');
         desktop.push_channel(7, b"count 1\ncount 2\n");
-        assert!(rendered(&desktop, 80, 24).contains("Counter !"));
+        assert!(desktop.render(80, 24).contains("Counter !"));
         desktop.command(b'5');
         assert!(desktop.search("count 1"));
         assert!(!desktop.broadcast_enabled());
@@ -737,7 +986,7 @@ mod tests {
         desktop.command(b'z');
         desktop.copy_move(0, 5);
         assert_eq!(desktop.panes[0].horizontal_offset, 5);
-        assert!(rendered(&desktop, 24, 8).contains("56789abcdef"));
+        assert!(desktop.render(24, 8).contains("56789abcdef"));
         desktop.copy_move(1, 0);
         assert_eq!(desktop.panes[0].scroll_offset, 1);
         desktop.copy_home();
