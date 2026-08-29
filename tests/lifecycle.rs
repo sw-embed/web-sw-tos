@@ -38,8 +38,9 @@ fn screen(desktop: &Desktop) -> String {
 
 fn feed(desktop: &mut Desktop, items: Vec<StreamItem>) {
     let mut console = Console::default();
+    let mut resources = swtos_frontend::resource::SnapshotAssembler::default();
     for item in items {
-        transport::route(desktop, &mut console, item);
+        transport::route(desktop, &mut console, &mut resources, item);
     }
 }
 

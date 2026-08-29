@@ -2,9 +2,23 @@
 //!
 //! Kept apart from the session so neither `run_until` nor `send_key` has to
 //! carry framing details inline.
+//!
+//! Three routing decisions are worth stating once, here, rather than at the
+//! arm that implements them:
+//!
+//! - An exited application keeps its pane, flagged `(ended)`. Upstream's
+//!   `release_channel` would drop it, destroying the program's final output
+//!   at the exact moment it becomes worth reading.
+//! - Resource snapshots arrive as bounded records and are published only once
+//!   a whole generation has landed; a partial one must never be shown.
+//! - Negotiation frames are the decoder's business, not the desktop's.
+//!   Reporting HelloAck as unhandled put a permanent "unhandled frame
+//!   HelloAck" in the status line of every session that negotiated
+//!   successfully -- an error message on the success path.
 
 use crate::debugger::Console;
 use swtos_frontend::protocol::{ConnectionDecoder, Frame, FrameType, Mode, StreamItem, hello};
+use swtos_frontend::resource::SnapshotAssembler;
 use swtos_frontend::ui::Desktop;
 use swtos_host::uart::{FRAME_BYTE_CYCLES, HEARTBEAT_BYTE_CYCLES, VirtualUart};
 
@@ -18,16 +32,18 @@ pub const SHELL: u8 = 0;
 /// a channel not seen before. Frame kinds owned by later steps are left
 /// alone rather than silently dropped: an unhandled kind surfaces in the
 /// status line so a missing feature looks missing instead of broken.
-pub fn route(desktop: &mut Desktop, console: &mut Console, item: StreamItem) {
+pub fn route(
+    desktop: &mut Desktop,
+    console: &mut Console,
+    resources: &mut SnapshotAssembler,
+    item: StreamItem,
+) {
     match item {
         StreamItem::Plain(bytes) => desktop.push_channel(SHELL, &bytes),
         StreamItem::Frame(frame) if frame.kind == FrameType::TtyOutput => {
             open_for_output(desktop, frame.channel);
             desktop.push_channel(frame.channel, &frame.payload);
         }
-        // An exited application keeps its pane, flagged. Upstream's
-        // `release_channel` would drop it, destroying the program's final
-        // output at the exact moment it becomes worth reading.
         StreamItem::Frame(frame) if frame.kind == FrameType::ChannelClose => {
             if let Some(title) = title_of(desktop, frame.channel)
                 && !title.ends_with(ENDED)
@@ -37,24 +53,26 @@ pub fn route(desktop: &mut Desktop, console: &mut Console, item: StreamItem) {
         }
         StreamItem::Frame(frame) if frame.kind == FrameType::ChannelOpen => {
             desktop.release_channel(frame.channel);
-            let title = String::from_utf8_lossy(&frame.payload).into_owned();
-            let title = if title.is_empty() {
+            let name = String::from_utf8_lossy(&frame.payload).into_owned();
+            let title = if name.is_empty() {
                 format!("TTY {}", frame.channel)
             } else {
-                title
+                name
             };
             desktop.add_application(frame.channel, title);
         }
         StreamItem::Frame(frame) if frame.kind == FrameType::DebugResponse => {
             console.response(desktop, &frame.payload);
         }
+        StreamItem::Frame(frame) if frame.kind == FrameType::ResourceSnapshot => {
+            let now = js_sys::Date::now();
+            if resources.push(&frame.payload, now) {
+                desktop.set_resources(&resources.render(now));
+            }
+        }
         StreamItem::Frame(frame) if frame.kind == FrameType::ChannelTitle => {
             desktop.set_channel_title(frame.channel, String::from_utf8_lossy(&frame.payload));
         }
-        // Negotiation frames are the decoder's business, not the desktop's.
-        // Reporting HelloAck as unhandled put a permanent "unhandled frame
-        // HelloAck" in the status line of every successfully negotiated
-        // session -- an error message for the success path.
         StreamItem::Frame(frame)
             if matches!(frame.kind, FrameType::Hello | FrameType::HelloAck) => {}
         StreamItem::Frame(frame) => {
@@ -133,7 +151,7 @@ pub fn transmit(uart: &mut VirtualUart, decoder: &ConnectionDecoder, channel: u8
     uart.send(bytes, HEARTBEAT_BYTE_CYCLES);
 }
 
-/// Send the periodic time tick SWTOS's clock consumers run on.
+/// Everything the frontend sends on a timer once framed.
 ///
 /// UPTIME and WALL_CLOCK carry a three-byte little-endian centisecond value
 /// on channel zero. Without them Uptime reads a tick that never arrives and
@@ -145,7 +163,7 @@ pub fn transmit(uart: &mut VirtualUart, decoder: &ConnectionDecoder, channel: u8
 /// heartbeat the target actually receives, even though emulated time runs
 /// slower than real time. Wall clock is real, being centiseconds since local
 /// midnight.
-pub fn time_ticks(uart: &mut VirtualUart, desktop: &mut Desktop, tick: u32) {
+pub fn periodic(uart: &mut VirtualUart, desktop: &mut Desktop, tick: u32) {
     // The status line's clock is the frontend's own, and was never being set:
     // it read `--:--:--` for the life of every session.
     let now = js_sys::Date::new_0();
@@ -170,6 +188,16 @@ pub fn time_ticks(uart: &mut VirtualUart, desktop: &mut Desktop, tick: u32) {
         if let Ok(encoded) = frame.encode() {
             uart.send(&encoded, FRAME_BYTE_CYCLES);
         }
+    }
+    // An empty RESOURCE_SNAPSHOT frame asks for a fresh generation; the reply
+    // arrives as bounded records and feeds the built-in monitor pane.
+    let request = Frame {
+        kind: FrameType::ResourceSnapshot,
+        channel: 0,
+        payload: Vec::new(),
+    };
+    if let Ok(encoded) = request.encode() {
+        uart.send(&encoded, FRAME_BYTE_CYCLES);
     }
 }
 

@@ -23,6 +23,7 @@ use crate::debugger::Console;
 use crate::keys;
 use crate::transport;
 use swtos_frontend::protocol::{ConnectionDecoder, Mode};
+use swtos_frontend::resource::SnapshotAssembler;
 use swtos_frontend::ui::{Cell, Desktop};
 use swtos_host::pump::{Pump, heartbeat_frame};
 use swtos_host::uart::{HEARTBEAT_BYTE_CYCLES, VirtualUart};
@@ -65,6 +66,8 @@ pub struct Session {
     next_hello: u32,
     /// The Debugger pane's local console. Not a TTY; see `debugger`.
     console: Console,
+    /// Assembles RESOURCE_SNAPSHOT records for the built-in monitor pane.
+    resources: SnapshotAssembler,
     /// Set once the debugger has greeted, after the transport goes framed.
     greeted: bool,
 }
@@ -88,7 +91,12 @@ impl Session {
             self.pump.run(&mut self.uart, BATCH);
             let output = self.uart.receive();
             for item in self.decoder.push(&output) {
-                transport::route(&mut self.desktop, &mut self.console, item);
+                transport::route(
+                    &mut self.desktop,
+                    &mut self.console,
+                    &mut self.resources,
+                    item,
+                );
             }
             done += 1;
             if js_sys::Date::now() >= deadline {
@@ -174,7 +182,7 @@ impl Session {
     /// keep the clock consumers fed.
     fn negotiate(&mut self) {
         if self.decoder.mode() == Mode::Framed && self.tick.is_multiple_of(TIME_TICK_INTERVAL) {
-            transport::time_ticks(&mut self.uart, &mut self.desktop, self.tick);
+            transport::periodic(&mut self.uart, &mut self.desktop, self.tick);
         }
         if self.tick >= self.next_hello {
             transport::negotiate(&mut self.uart, &self.decoder);
