@@ -1,0 +1,11 @@
+{
+  "task_type": "feature",
+  "state": {
+    "number": 16,
+    "step": "pane-lifecycle"
+  },
+  "action": "Kept the divergences at the boundary so they cost nothing at re-vendor time; caught a scripted edit that silently failed to match after indentation changed, where the only signal was a dead-code warning on the now-unused helper.",
+  "result": "success",
+  "reward": 1,
+  "timestamp": "2026-08-28T22:13:48"
+}
