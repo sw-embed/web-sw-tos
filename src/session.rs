@@ -168,6 +168,7 @@ impl Session {
         }
         if self.decoder.mode() == Mode::Framed && !self.greeted {
             self.greeted = true;
+            self.desktop.set_error(None);
             let request = self.console.greet(&mut self.desktop);
             transport::request(&mut self.uart, request);
         }

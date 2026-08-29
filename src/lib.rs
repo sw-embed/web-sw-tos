@@ -30,6 +30,7 @@ const MAX_CATCHUP: u32 = 20;
 
 pub enum Msg {
     Tick,
+    Resize,
     Key(String, bool),
     Geometry(usize),
 }
@@ -37,6 +38,9 @@ pub enum Msg {
 pub struct App {
     session: Session,
     geometry: usize,
+    /// Columns and rows measured from the window, for the `fit` geometry.
+    fit: (usize, usize),
+    fitted: bool,
     last: f64,
     ms_per_tick: f64,
     /// The next tick, re-armed after each one completes.
@@ -49,6 +53,7 @@ pub struct App {
     /// can without ever starving the page.
     next: Option<Timeout>,
     _keys: EventListener,
+    _resize: EventListener,
 }
 
 impl Component for App {
@@ -73,19 +78,32 @@ impl Component for App {
             event.prevent_default();
             keys.send_message(Msg::Key(event.key(), event.ctrl_key()));
         });
+        let sizer = ctx.link().clone();
+        let resize = EventListener::new(&gloo::utils::window(), "resize", move |_| {
+            sizer.send_message(Msg::Resize);
+        });
         Self {
             session: Session::default(),
             geometry: 0,
+            fit: (80, 24),
+            fitted: false,
             last: Date::now(),
             ms_per_tick: 0.0,
             next: Some(Timeout::new(0, move || link.send_message(Msg::Tick))),
             _keys: listener,
+            _resize: resize,
         }
     }
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::Tick => {
+                // The stage does not exist until after the first render, so
+                // the initial measurement waits for the first tick.
+                if !self.fitted {
+                    self.fitted = true;
+                    self.fit = chrome::fit();
+                }
                 let started = Date::now();
                 let owed = (((started - self.last) / TICK_MS) as u32).clamp(1, MAX_CATCHUP);
                 self.ms_per_tick = self.session.run_until(owed, started + BUDGET_MS);
@@ -100,12 +118,14 @@ impl Component for App {
                 self.session.send_key(&key, ctrl);
             }
             Msg::Geometry(index) => self.geometry = index.min(chrome::GEOMETRIES.len() - 1),
+            Msg::Resize => self.fit = chrome::fit(),
         }
         true
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
-        let (cols, rows) = chrome::GEOMETRIES[self.geometry];
+        let (_, cols, rows) = chrome::GEOMETRIES[self.geometry];
+        let (cols, rows) = if cols == 0 { self.fit } else { (cols, rows) };
         let status = self.session.status();
         let on_geometry = ctx.link().callback(|event: Event| {
             let select: HtmlSelectElement = event.target_unchecked_into();
