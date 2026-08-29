@@ -351,6 +351,18 @@ impl Desktop {
         self.focus
     }
 
+    /// Empty the focused pane: scrollback, partial line, and scroll offset.
+    ///
+    /// LOCAL ADDITION, not upstream. `te-rs` has no clear command at all, so
+    /// the only way to discard a pane's output there is to close the pane.
+    /// Additive rather than a change to existing logic, which is what keeps it
+    /// cheap to re-apply across re-vendoring.
+    pub fn clear_focused(&mut self) {
+        self.panes[self.focus].replace(&[]);
+        self.panes[self.focus].scroll_offset = 0;
+        self.panes[self.focus].horizontal_offset = 0;
+    }
+
     pub fn close_focused(&mut self) {
         if self.panes.len() > 1 {
             self.panes.remove(self.focus);

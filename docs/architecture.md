@@ -123,6 +123,7 @@ Current vendoring: **sw-tos d6dbce9**.
 | `resource.rs` | required | `Instant` -> `Millis` (`f64`), caller-supplied. `Instant::now()` panics on wasm32. |
 | `debug.rs` | required | `load(path)` -> `from_json(contents)`. No filesystem in a browser. |
 | `ui.rs` | required | Adds `Cell`, `Color`, `Attrs`, and a `render_grid` **adapter** over upstream's `render`. |
+| `ui.rs` | additive | Adds `clear_focused`. Upstream has no clear command at all, so its only way to discard a pane's output is to close the pane. |
 | all three | trace | Provenance header naming source repo, path, commit, and date. |
 
 `protocol.rs` is vendored unmodified and was unchanged upstream across this
@@ -154,6 +155,13 @@ assertions still exercise it.
 
 When colour arrives it enters as SGR in pane content, and `render_grid` is the
 one place that has to learn to parse it.
+
+The pane-lifecycle divergences are deliberately **not** in this table, because
+they are not patches. Ended panes, clearing on channel reuse, and opening a
+pane on `ChannelOpen` all live in `src/transport.rs`, this project's own frame
+routing, and cost nothing at re-vendor time. `clear_focused` is the single
+exception: emptying a pane needs the private field, so it is one additive
+method rather than a change to existing logic.
 
 ## What is vendored, and from where
 

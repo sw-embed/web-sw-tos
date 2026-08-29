@@ -146,6 +146,12 @@ impl Session {
     /// Run one frontend command. Prefix-`e` is the exception that reaches the
     /// target: it is how a running application is sent a real Escape.
     fn prefix_command(&mut self, key: &str) -> Vec<u8> {
+        // `c` is ours: upstream has no clear command, and intercepting it here
+        // keeps the vendored command table untouched.
+        if key == "c" {
+            self.desktop.clear_focused();
+            return Vec::new();
+        }
         if key == "e" {
             self.send(&[0x1b]);
             return vec![0x1b];

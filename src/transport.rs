@@ -22,10 +22,36 @@ pub fn route(desktop: &mut Desktop, console: &mut Console, item: StreamItem) {
     match item {
         StreamItem::Plain(bytes) => desktop.push_channel(SHELL, &bytes),
         StreamItem::Frame(frame) if frame.kind == FrameType::TtyOutput => {
+            // A channel reused after its process exited starts clean, so one
+            // program's output can never be read as the next one's. Dropping
+            // the pane and letting it be recreated is the clear.
+            if title_of(desktop, frame.channel).is_some_and(|t| t.ends_with(ENDED)) {
+                desktop.release_channel(frame.channel);
+            }
             if !desktop.has_channel(frame.channel) {
                 desktop.add_application(frame.channel, format!("TTY {}", frame.channel));
             }
             desktop.push_channel(frame.channel, &frame.payload);
+        }
+        // An exited application keeps its pane, flagged. Upstream's
+        // `release_channel` would drop it, destroying the program's final
+        // output at the exact moment it becomes worth reading.
+        StreamItem::Frame(frame) if frame.kind == FrameType::ChannelClose => {
+            if let Some(title) = title_of(desktop, frame.channel)
+                && !title.ends_with(ENDED)
+            {
+                desktop.set_channel_title(frame.channel, format!("{title}{ENDED}"));
+            }
+        }
+        StreamItem::Frame(frame) if frame.kind == FrameType::ChannelOpen => {
+            desktop.release_channel(frame.channel);
+            let title = String::from_utf8_lossy(&frame.payload);
+            let title = if title.is_empty() {
+                format!("TTY {}", frame.channel)
+            } else {
+                title.into_owned()
+            };
+            desktop.add_application(frame.channel, title);
         }
         StreamItem::Frame(frame) if frame.kind == FrameType::DebugResponse => {
             console.response(desktop, &frame.payload);
@@ -51,6 +77,22 @@ pub fn request(uart: &mut VirtualUart, payload: Vec<u8>) {
     if let Ok(encoded) = frame.encode() {
         uart.send(&encoded, FRAME_BYTE_CYCLES);
     }
+}
+
+/// Suffix marking a pane whose process has exited.
+///
+/// Deliberately carried in the title rather than in a side table: the title is
+/// already per-channel state the desktop owns, so there is nothing to keep in
+/// sync and nothing to leak when a pane is closed.
+pub const ENDED: &str = " (ended)";
+
+/// The title a channel's pane currently carries, if it has one.
+fn title_of(desktop: &Desktop, channel: u8) -> Option<String> {
+    desktop
+        .layout()
+        .into_iter()
+        .find(|(_, ch, _)| *ch == channel)
+        .map(|(_, _, title)| title)
 }
 
 /// The most payload bytes the target's decoder will accept in one frame.

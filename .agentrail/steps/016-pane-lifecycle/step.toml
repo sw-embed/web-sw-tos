@@ -1,6 +1,6 @@
 number = 16
 slug = "pane-lifecycle"
-status = "pending"
+status = "in-progress"
 description = "Implement the pane lifecycle decisions recorded in docs/plan.md under 'Pane l..."
 role = "production"
 context_files = []

@@ -18,7 +18,7 @@ pub const GEOMETRIES: [(usize, usize); 2] = [(80, 24), (120, 43)];
 pub fn diagnostics(status: &Status, ms: f64) -> Html {
     let text = if status.prefix_armed {
         "PREFIX -- ? help   z zoom   1-9 focus   n next   y copy-mode   \
-         e send-Escape-to-app   x close"
+         c clear   e send-Escape-to-app   x close"
             .to_string()
     } else {
         // The transport mode is the single most useful thing here: plain

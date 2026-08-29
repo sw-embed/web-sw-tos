@@ -2,7 +2,7 @@ mod chrome;
 pub mod debugger;
 pub mod keys;
 pub mod session;
-mod transport;
+pub mod transport;
 
 use gloo::events::EventListener;
 use gloo::timers::callback::Timeout;
