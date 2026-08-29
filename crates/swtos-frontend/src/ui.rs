@@ -144,6 +144,15 @@ impl Pane {
             match byte {
                 b'\n' => self.finish_line(),
                 b'\r' => self.current.clear(),
+                // Form feed clears the pane, so a program that redraws a whole
+                // report each time replaces it instead of appending another
+                // copy. Without this a monitor's output reads as a stuck
+                // program whenever its figures hold still.
+                0x0c => {
+                    self.lines.clear();
+                    self.current.clear();
+                    self.scroll_offset = 0;
+                }
                 0x08 | 0x7f => {
                     self.current.pop();
                 }

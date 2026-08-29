@@ -131,3 +131,30 @@ fn clear_empties_only_the_focused_pane() {
         "clear reached an unfocused pane: {text}"
     );
 }
+
+/// A form feed replaces a pane's contents instead of appending to them.
+///
+/// `mon` redraws a whole report each refresh and leads it with 0x0c. Without
+/// this the reports stack and the pane scrolls, which is what the browser did
+/// while the CLI replaced in place; worse, 0x0c fell through to the
+/// replacement-character arm, so every refresh also left visible garbage.
+#[test]
+fn a_form_feed_replaces_the_pane_rather_than_appending() {
+    let mut desktop = Desktop::default();
+    feed(&mut desktop, vec![output(3, "\x0cfirst report\n")]);
+    feed(&mut desktop, vec![output(3, "\x0csecond report\n")]);
+
+    let text = screen(&desktop);
+    assert!(
+        text.contains("second report"),
+        "latest report missing: {text}"
+    );
+    assert!(
+        !text.contains("first report"),
+        "the form feed did not clear the pane, so reports stacked: {text}"
+    );
+    assert!(
+        !text.contains('\u{fffd}'),
+        "the form feed rendered as a replacement character: {text}"
+    );
+}

@@ -124,7 +124,16 @@ Current vendoring: **sw-tos d6dbce9**.
 | `debug.rs` | required | `load(path)` -> `from_json(contents)`. No filesystem in a browser. |
 | `ui.rs` | required | Adds `Cell`, `Color`, `Attrs`, and a `render_grid` **adapter** over upstream's `render`. |
 | `ui.rs` | additive | Adds `clear_focused`. Upstream has no clear command at all, so its only way to discard a pane's output is to close the pane. |
+| `ui.rs` | tracking | Form-feed (`0x0c`) clears a pane. Copied byte-identical from upstream's **uncommitted** working tree; delete on the re-vendor that brings it in. |
 | all three | trace | Provenance header naming source repo, path, commit, and date. |
+
+A **tracking** patch is one that exists upstream but is not committed yet.
+Vendoring from `git show HEAD:...` is right -- provenance must name a commit
+that actually contains the content -- but it means uncommitted upstream work is
+invisible here, and the two frontends then behave differently for no reason a
+reader could see. Copy such a change verbatim, mark it tracking, and delete it
+when the commit lands. Verify it is byte-identical, so the re-vendor produces
+no diff at all.
 
 `protocol.rs` is vendored unmodified and was unchanged upstream across this
 cycle; it needs no patch at all.
