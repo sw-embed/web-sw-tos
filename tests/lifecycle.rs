@@ -40,7 +40,7 @@ fn feed(desktop: &mut Desktop, items: Vec<StreamItem>) {
     let mut console = Console::default();
     let mut resources = swtos_frontend::resource::SnapshotAssembler::default();
     for item in items {
-        transport::route(desktop, &mut console, &mut resources, item);
+        transport::route(desktop, &mut console, &mut resources, &mut 0, item);
     }
 }
 
@@ -156,5 +156,69 @@ fn a_form_feed_replaces_the_pane_rather_than_appending() {
     assert!(
         !text.contains('\u{fffd}'),
         "the form feed rendered as a replacement character: {text}"
+    );
+}
+
+/// SWTOS sends no CHANNEL_CLOSE when a process exits, so the resource
+/// snapshot is the only authority on what is alive. A killed program's pane
+/// must be flagged, or it sits displaying its last output forever, looking
+/// exactly like one still running.
+#[test]
+fn a_pane_is_flagged_when_its_process_leaves_the_snapshot() {
+    use swtos_frontend::resource::{ProcessSnapshot, ResourceSnapshot};
+
+    fn snapshot_with(endpoint: u8, name: &str, state: u8) -> ResourceSnapshot {
+        let mut snapshot = ResourceSnapshot::default();
+        snapshot.processes.insert(
+            endpoint,
+            ProcessSnapshot {
+                endpoint,
+                state,
+                name: name.into(),
+                ..Default::default()
+            },
+        );
+        snapshot
+    }
+
+    let mut desktop = Desktop::default();
+    let mut seen = 0u32;
+    // Channel 1 carries endpoint 2, which is te-rs's own convention.
+    feed(&mut desktop, vec![output(1, "mon report\n")]);
+
+    transport::follow_processes(&mut desktop, &snapshot_with(2, "mon", 1), &mut seen);
+    let named = screen(&desktop);
+    assert!(
+        named.contains("mon"),
+        "pane not named from the snapshot: {named}"
+    );
+    assert!(
+        !named.contains(ENDED.trim()),
+        "a live process was flagged ended"
+    );
+
+    // The process is killed: endpoint 2 vanishes from the snapshot entirely.
+    transport::follow_processes(&mut desktop, &ResourceSnapshot::default(), &mut seen);
+    let ended = screen(&desktop);
+    assert!(
+        ended.contains(ENDED.trim()),
+        "an exited process left its pane unflagged: {ended}"
+    );
+    assert!(
+        ended.contains("mon report"),
+        "flagging the pane destroyed its final output: {ended}"
+    );
+}
+
+/// A pane that never hosted a process must not be flagged as having lost one.
+#[test]
+fn a_pane_that_never_ran_anything_is_not_flagged() {
+    use swtos_frontend::resource::ResourceSnapshot;
+    let mut desktop = Desktop::default();
+    let mut seen = 0u32;
+    transport::follow_processes(&mut desktop, &ResourceSnapshot::default(), &mut seen);
+    assert!(
+        !screen(&desktop).contains(ENDED.trim()),
+        "an idle pane was flagged ended"
     );
 }

@@ -22,11 +22,11 @@
 use crate::debugger::Console;
 use crate::keys;
 use crate::transport;
-use swtos_frontend::protocol::{ConnectionDecoder, Mode};
+use swtos_frontend::protocol::{ConnectionDecoder, Mode, hello};
 use swtos_frontend::resource::SnapshotAssembler;
 use swtos_frontend::ui::{Cell, Desktop};
 use swtos_host::pump::{Pump, heartbeat_frame};
-use swtos_host::uart::{HEARTBEAT_BYTE_CYCLES, VirtualUart};
+use swtos_host::uart::{FRAME_BYTE_CYCLES, HEARTBEAT_BYTE_CYCLES, VirtualUart};
 
 /// Cycles to run per tick beyond the heartbeat's own pacing. Matches the
 /// batch size the command-line adapter uses.
@@ -68,6 +68,9 @@ pub struct Session {
     console: Console,
     /// Assembles RESOURCE_SNAPSHOT records for the built-in monitor pane.
     resources: SnapshotAssembler,
+    /// Endpoints that have ever been live, as a bitmask. Without it a pane
+    /// that never hosted a process would be flagged as having lost one.
+    seen_endpoints: u32,
     /// Set once the debugger has greeted, after the transport goes framed.
     greeted: bool,
 }
@@ -95,6 +98,7 @@ impl Session {
                     &mut self.desktop,
                     &mut self.console,
                     &mut self.resources,
+                    &mut self.seen_endpoints,
                     item,
                 );
             }
@@ -184,8 +188,12 @@ impl Session {
         if self.decoder.mode() == Mode::Framed && self.tick.is_multiple_of(TIME_TICK_INTERVAL) {
             transport::periodic(&mut self.uart, &mut self.desktop, self.tick);
         }
+        // Re-offer HELLO while unnegotiated: the target is not listening
+        // during early boot, so one attempt at startup is not enough.
         if self.tick >= self.next_hello {
-            transport::negotiate(&mut self.uart, &self.decoder);
+            if let Ok(bytes) = hello().encode() {
+                self.uart.send(&bytes, FRAME_BYTE_CYCLES);
+            }
             self.next_hello = self.tick.wrapping_add(HELLO_RETRY_TICKS);
         }
         if self.decoder.mode() == Mode::Framed && !self.greeted {

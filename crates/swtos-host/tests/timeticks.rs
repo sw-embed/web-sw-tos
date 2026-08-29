@@ -77,10 +77,7 @@ fn mon_reports_when_the_uptime_tick_arrives() {
 /// Uptime counts up. Without the tick it reads a value that never arrives.
 #[test]
 fn uptime_counts_monotonically_when_ticked() {
-    let text: String = session(b"3", true)
-        .into_iter()
-        .map(|(_, t)| t)
-        .collect();
+    let text: String = session(b"3", true).into_iter().map(|(_, t)| t).collect();
     let stamps: Vec<u32> = text
         .lines()
         .filter_map(|line| {

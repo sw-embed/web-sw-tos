@@ -41,6 +41,15 @@ features = [
 [dev-dependencies]
 swtos-frontend = { path = "crates/swtos-frontend" }
 
+# The emulator is the hot loop in every test: unoptimised it runs tens of
+# times slower, which turned `cargo test --workspace` into a ten-minute wait.
+# Optimising just the dependency keeps this project's own code debuggable.
+[profile.dev.package.cor24-emulator]
+opt-level = 3
+
+[profile.dev.package.cor24-isa]
+opt-level = 3
+
 [profile.release]
 opt-level = "z"
 lto = true

@@ -45,7 +45,10 @@ fn the_target_answers_a_resource_request_with_a_whole_generation() {
 
     let text = published.join("\n");
     println!("--- monitor pane ---\n{text}");
-    assert!(!published.is_empty(), "no complete generation was published");
+    assert!(
+        !published.is_empty(),
+        "no complete generation was published"
+    );
     assert!(
         text.contains("slots="),
         "memory line missing from the report: {text}"

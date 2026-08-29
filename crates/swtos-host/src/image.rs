@@ -17,8 +17,7 @@ pub const BUILD_ID: &str = "crc24:67d633";
 pub const IMAGE_SIZE: usize = 25529;
 
 /// SHA-256 the debug map records for the image.
-pub const IMAGE_SHA256: &str =
-    "1f1480bf12e0657566565dee89e11d0fc0fb8dec1bf551b0471dbfea7f3943f6";
+pub const IMAGE_SHA256: &str = "1f1480bf12e0657566565dee89e11d0fc0fb8dec1bf551b0471dbfea7f3943f6";
 
 #[cfg(test)]
 mod tests {
