@@ -1,0 +1,11 @@
+[package]
+name = "swtos-input"
+version = "0.1.0"
+edition = "2024"
+authors = ["Michael A Wright"]
+license = "MIT"
+description = "Browser key events to SWTOS terminal bytes and frontend commands"
+
+[dependencies]
+swtos-frontend = { path = "../swtos-frontend" }
+swtos-session = { path = "../swtos-session" }

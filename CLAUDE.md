@@ -223,6 +223,36 @@ sibling `web-sw-cor24-apl` repo documents.
   at 7), crates <= 4 modules (fail at 7), and the Web UI checks for favicon,
   `index.html`, and footer requirements.
 
+### sw-checklist is a forcing function
+
+Its limits exist to encourage functional programming, loose coupling, pure
+functions, delegation, composition, design patterns, macros, and `include_*!`
+macros for non-code. **Never take a documented exception for code we author**
+-- the goal is readable, maintainable, testable code, and an exception
+delivers none of it. Verbatim vendored files are the sole exception already
+agreed, and clippy is still fixed even there.
+
+When a count goes over, the answer is design, not compression:
+
+- Decompose by concern into a new module or **crate**; each crate has its own
+  module budget, so real structure makes the counts fall out.
+- Prefer **composition** -- a struct built from smaller collaborating structs,
+  so each function borrows only the part it needs.
+- **Separate data declarations from behaviour**: declarations (structs, enums,
+  traits) in a module with no `impl` blocks; behaviour as functions elsewhere.
+- **`lib.rs` holds only `mod` and `use`** -- never functions.
+- Use **named files for modules**.
+- Inject dependencies as **traits**; put fakes, mocks and spies in `tests/`,
+  never in shipped code.
+- **Prefer integration tests** in `tests/` to inline `#[cfg(test)]` units.
+- Never `#[allow]`; fix the finding.
+
+Inlining to reduce a function count is the anti-pattern: it lengthens
+functions and increases coupling. Two defects here came from exactly that --
+a dropped `Mode::Plain` HELLO guard and a deleted `CHANNEL_CLOSE` arm -- and
+both lived in code no native test could reach because it read `js_sys::Date`
+directly. Purity and injection are what make behaviour testable.
+
 ## Related repositories (siblings under ~/github/sw-embed/)
 
 | Repo | Role here |

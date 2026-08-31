@@ -1,6 +1,6 @@
 number = 18
 slug = "pure-core-crate"
-status = "pending"
+status = "in-progress"
 description = "Restructure toward the design sw-checklist is a forcing function for, rather ..."
 role = "production"
 context_files = []

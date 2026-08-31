@@ -6,6 +6,16 @@
 
 use swtos_frontend::ui::Desktop;
 
+/// Keys that are modifiers in their own right. A browser delivers these as
+/// their own keydown before the character they produce, which a terminal
+/// never does.
+pub fn is_modifier(key: &str) -> bool {
+    matches!(
+        key,
+        "Shift" | "Control" | "Alt" | "Meta" | "CapsLock" | "AltGraph"
+    )
+}
+
 /// The bytes a real terminal would send for this key, or empty if the key is
 /// not one the target should see.
 ///

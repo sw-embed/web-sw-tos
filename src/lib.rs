@@ -1,13 +1,10 @@
+mod browser;
 mod chrome;
-pub mod debugger;
-pub mod keys;
-pub mod session;
-pub mod transport;
 
 use gloo::events::EventListener;
 use gloo::timers::callback::Timeout;
 use js_sys::Date;
-use session::Session;
+use swtos_session::state::Session;
 use wasm_bindgen::JsCast;
 use web_sys::HtmlSelectElement;
 use yew::prelude::*;
@@ -68,17 +65,7 @@ impl Component for App {
     /// keep working; everything else, Ctrl included, belongs to the terminal.
     fn create(ctx: &Context<Self>) -> Self {
         let link = ctx.link().clone();
-        let keys = ctx.link().clone();
-        let listener = EventListener::new(&gloo::utils::window(), "keydown", move |event| {
-            let Some(event) = event.dyn_ref::<KeyboardEvent>() else {
-                return;
-            };
-            if event.meta_key() || event.alt_key() {
-                return;
-            }
-            event.prevent_default();
-            keys.send_message(Msg::Key(event.key(), event.ctrl_key()));
-        });
+        let listener = browser::on_keydown(ctx.link().clone());
         // The debug map is fetched rather than compiled in: at 1.6 MB it
         // would dwarf the WASM module and be re-committed to pages/ on every
         // rebuild. Same-origin, so the demo stays fully client-side.
@@ -92,12 +79,9 @@ impl Component for App {
                 loader.send_message(Msg::MapLoaded(text));
             }
         });
-        let sizer = ctx.link().clone();
-        let resize = EventListener::new(&gloo::utils::window(), "resize", move |_| {
-            sizer.send_message(Msg::Resize);
-        });
+        let resize = browser::on_resize(ctx.link().clone());
         Self {
-            session: Session::default(),
+            session: swtos_session::build::session(),
             geometry: 0,
             fit: (80, 24),
             fitted: false,
@@ -120,7 +104,13 @@ impl Component for App {
                 }
                 let started = Date::now();
                 let owed = (((started - self.last) / TICK_MS) as u32).clamp(1, MAX_CATCHUP);
-                self.ms_per_tick = self.session.run_until(owed, started + BUDGET_MS);
+                let ran = swtos_session::driver::run(
+                    &mut self.session,
+                    owed,
+                    started + BUDGET_MS,
+                    &browser::BrowserClock,
+                );
+                self.ms_per_tick = (Date::now() - started) / f64::from(ran);
                 self.last = started;
                 // Aim for the 100 Hz cadence, but never schedule zero delay:
                 // the browser has to get a turn between ticks.
@@ -129,11 +119,11 @@ impl Component for App {
                 self.next = Some(Timeout::new(delay, move || link.send_message(Msg::Tick)));
             }
             Msg::Key(key, ctrl) => {
-                self.session.send_key(&key, ctrl);
+                swtos_input::dispatch::key(&mut self.session, &key, ctrl);
             }
             Msg::Geometry(index) => self.geometry = index.min(chrome::GEOMETRIES.len() - 1),
             Msg::Resize => self.fit = chrome::fit(),
-            Msg::MapLoaded(json) => self.session.load_map(&json),
+            Msg::MapLoaded(json) => swtos_session::driver::load_map(&mut self.session, &json),
         }
         true
     }
@@ -141,7 +131,7 @@ impl Component for App {
     fn view(&self, ctx: &Context<Self>) -> Html {
         let (_, cols, rows) = chrome::GEOMETRIES[self.geometry];
         let (cols, rows) = if cols == 0 { self.fit } else { (cols, rows) };
-        let status = self.session.status();
+        let status = swtos_session::driver::status(&self.session);
         let on_geometry = ctx.link().callback(|event: Event| {
             let select: HtmlSelectElement = event.target_unchecked_into();
             Msg::Geometry(select.selected_index().max(0) as usize)
@@ -167,7 +157,9 @@ impl App {
     /// that has to start emitting spans.
     fn screen(&self, cols: usize, rows: usize) -> String {
         self.session
-            .grid(cols, rows)
+            .panes
+            .desktop
+            .render_grid(cols, rows)
             .into_iter()
             .map(|row| row.into_iter().map(|cell| cell.ch).collect::<String>())
             .collect::<Vec<_>>()

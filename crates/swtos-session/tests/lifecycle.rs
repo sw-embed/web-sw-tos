@@ -8,8 +8,9 @@
 
 use swtos_frontend::protocol::{Frame, FrameType, StreamItem};
 use swtos_frontend::ui::Desktop;
-use web_sw_tos::debugger::Console;
-use web_sw_tos::transport::{self, ENDED};
+use swtos_session::build;
+use swtos_session::routing::{self, ENDED};
+use swtos_session::state::Panes;
 
 fn output(channel: u8, text: &str) -> StreamItem {
     StreamItem::Frame(Frame {
@@ -37,11 +38,16 @@ fn screen(desktop: &Desktop) -> String {
 }
 
 fn feed(desktop: &mut Desktop, items: Vec<StreamItem>) {
-    let mut console = Console::default();
-    let mut resources = swtos_frontend::resource::SnapshotAssembler::default();
+    let mut console = build::console();
+    let mut panes = Panes {
+        desktop: core::mem::take(desktop),
+        resources: Default::default(),
+        seen_endpoints: 0,
+    };
     for item in items {
-        transport::route(desktop, &mut console, &mut resources, &mut 0, item);
+        routing::route(&mut panes, &mut console, 0.0, item);
     }
+    *desktop = panes.desktop;
 }
 
 /// An ended application keeps its pane and its output, flagged.
@@ -186,7 +192,7 @@ fn a_pane_is_flagged_when_its_process_leaves_the_snapshot() {
     // Channel 1 carries endpoint 2, which is te-rs's own convention.
     feed(&mut desktop, vec![output(1, "mon report\n")]);
 
-    transport::follow_processes(&mut desktop, &snapshot_with(2, "mon", 1), &mut seen);
+    routing::follow(&mut desktop, &snapshot_with(2, "mon", 1), &mut seen);
     let named = screen(&desktop);
     assert!(
         named.contains("mon"),
@@ -198,7 +204,7 @@ fn a_pane_is_flagged_when_its_process_leaves_the_snapshot() {
     );
 
     // The process is killed: endpoint 2 vanishes from the snapshot entirely.
-    transport::follow_processes(&mut desktop, &ResourceSnapshot::default(), &mut seen);
+    routing::follow(&mut desktop, &ResourceSnapshot::default(), &mut seen);
     let ended = screen(&desktop);
     assert!(
         ended.contains(ENDED.trim()),
@@ -216,7 +222,7 @@ fn a_pane_that_never_ran_anything_is_not_flagged() {
     use swtos_frontend::resource::ResourceSnapshot;
     let mut desktop = Desktop::default();
     let mut seen = 0u32;
-    transport::follow_processes(&mut desktop, &ResourceSnapshot::default(), &mut seen);
+    routing::follow(&mut desktop, &ResourceSnapshot::default(), &mut seen);
     assert!(
         !screen(&desktop).contains(ENDED.trim()),
         "an idle pane was flagged ended"

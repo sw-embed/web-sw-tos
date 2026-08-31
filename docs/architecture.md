@@ -10,36 +10,62 @@ workspace from the start rather than being refactored under pressure later.
 ## Workspace layout
 
 ```
-web-sw-tos/                    root crate, the Yew application
-  src/lib.rs                   App component, module declarations
+web-sw-tos/                    root crate: the browser, and nothing else
+  src/lib.rs                   App component; `mod` statements only
   src/main.rs                  Yew renderer entry point
-  src/footer.rs                build-info footer
-  src/terminal.rs              fixed-size character grid  (step 006)
-  src/keys.rs                  key capture and Ctrl-A prefix (step 007)
+  src/browser.rs               the only code that touches js_sys/web_sys
+  src/chrome.rs                page chrome and the fitted geometry
 
-crates/swtos-frontend/         vendored te-rs core        (step 003)
-  src/lib.rs
-  src/protocol.rs              framed transport, unchanged from te-rs
-  src/ui.rs                    Desktop pane model + render_grid()
-  src/resource.rs              RESOURCE_SNAPSHOT assembler
-  src/debug.rs                 debugger console + debug map
+crates/swtos-session/          pure session logic, no browser dependency
+  src/state.rs                 declarations only: no impl blocks
+  src/build.rs                 construction
+  src/driver.rs                the run loop
+  src/sending.rs               everything put on the wire
+  src/routing.rs               inbound frames to panes
+  src/debugger.rs              the Debugger pane's local console
 
-crates/swtos-host/             emulator side
-  src/lib.rs
-  src/image.rs                 vendored SWTOS image + identity   (done)
-  src/uart.rs                  in-process virtual UART
-  src/pump.rs                  run_batch driver + 100 Hz heartbeat
+crates/swtos-input/            keyboard, layered on the session
+  src/translate.rs             key events to terminal bytes
+  src/dispatch.rs              prefix, copy mode, console panes, target
 
-assets/                        vendored, not built
-  program.bin                  embedded with include_bytes!
-  program.debug.json           served as a static asset, not compiled in
-  PROVENANCE.md                source commit, sizes, and identity table
+crates/swtos-frontend/         vendored te-rs core
+crates/swtos-host/             emulator, virtual UART, vendored image
 ```
 
-Each crate stays at or under seven modules, and two of the three stay at or
-under five. The split also mirrors the CLI's own process boundary: `swtos-host`
-is what `tools/cor24-debug-adapter` is, `swtos-frontend` is what `tools/te-rs`
-is, and `swtos-host`'s `uart.rs` is what the pty is.
+Dependencies run one way: `web-sw-tos` -> `swtos-input` -> `swtos-session` ->
+`swtos-frontend` and `swtos-host`. Nothing points back.
+
+## Why this shape
+
+`sw-checklist` is a forcing function for functional programming, loose
+coupling, pure functions, delegation, and composition. Its limits are not
+satisfied by compression, and never by an exception on code we author.
+
+Two defects made that concrete. A `Mode::Plain` guard on the HELLO retry was
+dropped while inlining a function to reduce a count, which let the browser
+re-attach every 25 ticks and reprint the menu forever. A `CHANNEL_CLOSE` arm
+was deleted to win back six lines. Both were **mechanical compression**, and
+both lived in code no native test could reach, because `session.rs` and
+`transport.rs` read `js_sys::Date` directly.
+
+So the fix was design, not tidying:
+
+- **Time is injected.** `state::Clock` is a trait; the browser implements it in
+  `src/browser.rs` and tests supply a fake from `tests/`. That one change made
+  the whole session testable, and the HELLO guard now has a test that fails if
+  it is dropped again.
+- **Data is separated from behaviour.** `state.rs` holds declarations with no
+  `impl` blocks; the functions that act on them live in modules named for the
+  job they do.
+- **`Session` is composed**, not flat: `Transport`, `Panes`, `Input`, and
+  `Console`, so routing never sees the UART and sending never sees the panes.
+- **`lib.rs` holds only `mod` statements.**
+- **Crates split by concern**, so module budgets fall out of the design rather
+  than being fought.
+- **Test doubles live in test code.** Nothing shipped exists for tests.
+
+Remaining findings in these crates are warnings, never failures, and each is a
+cohesive module at five to seven functions rather than a place to hide.
 
 ## Build order
 

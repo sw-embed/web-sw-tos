@@ -977,6 +977,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "swtos-input"
+version = "0.1.0"
+dependencies = [
+ "swtos-frontend",
+ "swtos-session",
+]
+
+[[package]]
+name = "swtos-session"
+version = "0.1.0"
+dependencies = [
+ "swtos-frontend",
+ "swtos-host",
+]
+
+[[package]]
 name = "syn"
 version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1206,6 +1222,8 @@ dependencies = [
  "js-sys",
  "swtos-frontend",
  "swtos-host",
+ "swtos-input",
+ "swtos-session",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

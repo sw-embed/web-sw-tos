@@ -1,5 +1,10 @@
 [workspace]
-members = ["crates/swtos-frontend", "crates/swtos-host"]
+members = [
+    "crates/swtos-frontend",
+    "crates/swtos-host",
+    "crates/swtos-input",
+    "crates/swtos-session",
+]
 
 [package]
 name = "web-sw-tos"
@@ -16,6 +21,8 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 swtos-host = { path = "crates/swtos-host" }
 swtos-frontend = { path = "crates/swtos-frontend" }
+swtos-input = { path = "crates/swtos-input" }
+swtos-session = { path = "crates/swtos-session" }
 cor24-emulator = { path = "../sw-cor24-emulator" }
 cor24-isa = { path = "../sw-cor24-isa", features = ["serde"] }
 yew = { version = "0.21", features = ["csr"] }
@@ -40,6 +47,8 @@ features = [
 
 [dev-dependencies]
 swtos-frontend = { path = "crates/swtos-frontend" }
+swtos-input = { path = "crates/swtos-input" }
+swtos-session = { path = "crates/swtos-session" }
 
 # The emulator is the hot loop in every test: unoptimised it runs tens of
 # times slower, which turned `cargo test --workspace` into a ten-minute wait.

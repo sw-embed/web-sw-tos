@@ -1,0 +1,11 @@
+[package]
+name = "swtos-session"
+version = "0.1.0"
+edition = "2024"
+authors = ["Michael A Wright"]
+license = "MIT"
+description = "Pure session logic for the SWTOS browser demo: keys, routing, and the debugger console"
+
+[dependencies]
+swtos-frontend = { path = "../swtos-frontend" }
+swtos-host = { path = "../swtos-host" }

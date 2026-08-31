@@ -3,7 +3,7 @@
 //! Header and footer live together so the crate stays inside sw-checklist's
 //! four-module budget while `view` stays inside its line budget.
 
-use crate::session::Status;
+use swtos_session::state::Status;
 use yew::prelude::*;
 
 const REPOSITORY: &str = "https://github.com/sw-embed/web-sw-tos";
