@@ -139,6 +139,16 @@ impl Session {
     /// claims navigation keys. Only what none of them wants reaches SWTOS.
     ///
     pub fn send_key(&mut self, key: &str, ctrl: bool) -> Vec<u8> {
+        // A bare modifier keydown is neither a command nor input. Without
+        // this it is consumed as the prefix command, so every binding that
+        // needs Shift -- `?` for help, `S` to restore a closed pane -- is
+        // swallowed by the Shift press that produces it.
+        if matches!(
+            key,
+            "Shift" | "Control" | "Alt" | "Meta" | "CapsLock" | "AltGraph"
+        ) {
+            return Vec::new();
+        }
         if std::mem::take(&mut self.prefix_armed) {
             return self.prefix_command(key);
         }

@@ -122,3 +122,35 @@ fn both_clear_bindings_are_consumed_by_the_frontend() {
         );
     }
 }
+
+/// A modifier keydown must not consume the prefix.
+///
+/// `?` and `S` are both produced by holding Shift, and the browser delivers
+/// that Shift as its own keydown first. Treating it as the prefix command
+/// swallowed it, leaving `Ctrl-A ?` and `Ctrl-A S` dead while unshifted
+/// bindings like `Ctrl-A h` worked -- which is exactly how it was reported.
+#[test]
+fn a_shift_press_does_not_swallow_the_prefix() {
+    for modifier in ["Shift", "Control", "Alt", "Meta", "CapsLock", "AltGraph"] {
+        let mut session = Session::default();
+        session.send_key("a", true);
+        assert!(
+            session.send_key(modifier, false).is_empty(),
+            "{modifier} leaked to the target"
+        );
+        assert!(
+            session.status().prefix_armed,
+            "{modifier} consumed the armed prefix"
+        );
+        // The real command still lands afterwards.
+        assert!(session.send_key("?", false).is_empty());
+        assert!(!session.status().prefix_armed, "the command never ran");
+    }
+}
+
+/// A modifier on its own is not input either.
+#[test]
+fn a_modifier_alone_sends_nothing() {
+    let mut session = Session::default();
+    assert!(session.send_key("Shift", false).is_empty());
+}
