@@ -1,6 +1,6 @@
 number = 17
 slug = "mon-and-time-ticks"
-status = "in-progress"
+status = "completed"
 description = """
 Re-vendor sw-tos 1e75960 and send the time ticks that make it useful.
 
@@ -8,5 +8,6 @@ New up..."""
 role = "production"
 context_files = []
 created_at = "2026-08-29T00:05:30"
+completed_at = "2026-08-30T18:55:24"
 task_type = "integration"
-commits = []
+commits = ["8c78cd04d450f81921db60356d5d8a1c660f52e3"]

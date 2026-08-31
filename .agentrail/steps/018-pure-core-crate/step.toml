@@ -1,0 +1,9 @@
+number = 18
+slug = "pure-core-crate"
+status = "pending"
+description = "Restructure toward the design sw-checklist is a forcing function for, rather ..."
+role = "production"
+context_files = []
+created_at = "2026-08-30T18:55:00"
+task_type = "integration"
+commits = []

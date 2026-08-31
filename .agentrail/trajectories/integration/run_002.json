@@ -1,0 +1,11 @@
+{
+  "task_type": "integration",
+  "state": {
+    "number": 17,
+    "step": "mon-and-time-ticks"
+  },
+  "action": "Used docs/use-cases.md as a checkable parity list rather than guessing; measured the payload bound, the channel-to-endpoint mapping, and the HELLO restart behaviour against the target instead of assuming them; vendored source from the committed tree with git show while sw-tos was dirty.",
+  "result": "success",
+  "reward": 1,
+  "timestamp": "2026-08-30T18:55:24"
+}

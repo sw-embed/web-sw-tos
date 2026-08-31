@@ -1,4 +1,4 @@
-number = 22
+number = 23
 slug = "preemption-acceptance"
 status = "pending"
 description = "The dual cpu-hog proof running in the browser."
