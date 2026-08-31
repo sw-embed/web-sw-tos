@@ -142,16 +142,14 @@ Every local change to a vendored file, so re-vendoring is mechanical rather
 than archaeological. Re-vendor by copying upstream fresh, then walking this
 table.
 
-Current vendoring: **sw-tos d6dbce9**.
+Current vendoring: **sw-tos e08fa4e**.
 
 | File | Kind | Change |
 |---|---|---|
 | `resource.rs` | required | `Instant` -> `Millis` (`f64`), caller-supplied. `Instant::now()` panics on wasm32. |
 | `debug.rs` | required | `load(path)` -> `from_json(contents)`. No filesystem in a browser. |
 | `ui.rs` | required | Adds `Cell`, `Color`, `Attrs`, and a `render_grid` **adapter** over upstream's `render`. |
-| `ui.rs` | additive | Adds `clear_focused`. Upstream has no clear command at all, so its only way to discard a pane's output is to close the pane. |
-| `ui.rs` | tracking | Form-feed (`0x0c`) clears a pane. Copied byte-identical from upstream's **uncommitted** working tree; delete on the re-vendor that brings it in. |
-| all three | trace | Provenance header naming source repo, path, commit, and date. |
+| all five | trace | Provenance header naming source repo, path, commit, and date. |
 
 A **tracking** patch is one that exists upstream but is not committed yet.
 Vendoring from `git show HEAD:...` is right -- provenance must name a commit
@@ -161,10 +159,38 @@ reader could see. Copy such a change verbatim, mark it tracking, and delete it
 when the commit lands. Verify it is byte-identical, so the re-vendor produces
 no diff at all.
 
-`protocol.rs` is vendored unmodified and was unchanged upstream across this
-cycle; it needs no patch at all.
+`protocol.rs` is vendored unmodified and has now been unchanged upstream for
+five cycles; it needs no patch at all. `disasm.rs` is new this cycle and is
+also vendored unmodified -- it arrived with the ability to disassemble from
+image bytes, so `dis` no longer depends on the debug map being loaded.
 
-### What the last re-vendor taught
+Only two kinds of patch are left, and both are forced by the platform: no
+filesystem, and no `Instant`. Every patch that existed because this project
+wanted different behaviour is gone.
+
+### What this re-vendor taught
+
+The table lost a row for the second cycle running, and this time the deletions
+came from outside it as well. Upstream grew `ended` on a pane,
+`mark_live_endpoints`, `close_ended`, `name_channel`, `clear`, and
+`clear_channel`, and stopped stealing focus on `add_application`. Each of those
+had a local counterpart here: an ENDED title suffix, an endpoints-seen bitmask,
+`clear_focused`, and an `add_without_focus`/`restore_focus` pair. All were
+deleted rather than reconciled.
+
+Two of them were actively in the way. `clear_focused` was the last additive
+patch to a vendored file, and keeping it would have meant carrying a private
+method beside an upstream one that did the same job. Worse, this project bound
+`Ctrl-A l` and `Ctrl-A c` locally; upstream now binds the same two keys to
+`clear` and `close_ended`, so the local interception was shadowing the real
+commands. Deleting local code the moment upstream ships an equivalent is not
+tidiness -- it is what stops the two frontends drifting into disagreement about
+what a key means.
+
+`panes.rs` is what is left: the part upstream genuinely does not do, which is
+mapping this project's channels onto upstream's endpoints.
+
+### What the previous re-vendor taught
 
 The three clippy patches this table used to carry are **gone**, exactly as
 planned: upstream cleared its own clippy findings in `71ff551`, including
@@ -192,11 +218,12 @@ When colour arrives it enters as SGR in pane content, and `render_grid` is the
 one place that has to learn to parse it.
 
 The pane-lifecycle divergences are deliberately **not** in this table, because
-they are not patches. Ended panes, clearing on channel reuse, and opening a
-pane on `ChannelOpen` all live in `src/transport.rs`, this project's own frame
-routing, and cost nothing at re-vendor time. `clear_focused` is the single
-exception: emptying a pane needs the private field, so it is one additive
-method rather than a change to existing logic.
+they are not patches. Opening a pane on `ChannelOpen` and following the
+resource snapshot live in `crates/swtos-session/`, this project's own frame
+routing, and cost nothing at re-vendor time. There is no longer any exception:
+with `clear_focused` gone, every vendored file is either unmodified or carries
+only a platform-forced patch, which is why all 28 vendored tests run
+unmodified.
 
 ## What is vendored, and from where
 

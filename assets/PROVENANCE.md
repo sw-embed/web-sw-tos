@@ -13,22 +13,29 @@ deployed from a clean checkout.
 | Field | Value |
 |---|---|
 | Source repository | `sw-embed/sw-tos` |
-| Source commit | `1e75960e1b0751bdf42c103412a9b18eafc25329` |
+| Source commit | `e08fa4ed9edce356bdc7b6d20df18928f5bee34b` |
 | Source path | `build/scheduled-shell/` |
-| Vendored on | 2026-08-28 (re-vendored) |
+| Vendored on | 2026-08-31 (re-vendored) |
 | Build recipe | `just scheduled-shell-build` |
 
-At vendoring time the `sw-tos` working tree had uncommitted changes to
-`tools/te-rs/src/main.rs`. That file belongs to the `te-rs` terminal frontend and takes no
-part in producing the image, so the artifacts still correspond to the commit
-above. Recorded because a dirty source tree is otherwise invisible later.
+`sw-tos` has since moved to `5839aad`, which is **not** vendored here. Those
+two commits change only the image source -- `ps` reports `WAITING` rather than
+`BLOCKED`, and `ps -l` became the same report `mon` prints, from the same code
+-- and no built artifacts exist for them: `build/scheduled-shell/` still holds
+`crc24:500933`, and the working tree is mid-edit. Building there to get ahead
+would mean writing into a repository this project treats as read-only, and
+would produce an image matching no commit at all. The vendored pair is
+therefore the newest one that is both built and identifiable.
+
+Nothing here reads those state names, so the gap costs only the two new
+behaviours, not correctness.
 
 ## Artifacts
 
 | File | Size | Role |
 |---|---|---|
-| `program.bin` | 25,529 bytes | The preemptive-multitasking image, loaded at address 0 |
-| `program.debug.json` | 1,728,900 bytes | Symbol, function, and instruction map for the debugger pane |
+| `program.bin` | 26,948 bytes | The preemptive-multitasking image, loaded at address 0 |
+| `program.debug.json` | 1,824,948 bytes | Symbol, function, and instruction map for the debugger pane |
 
 ## Identity
 
@@ -38,10 +45,10 @@ be replaced together.
 | Field | Value |
 |---|---|
 | `format` | `swtos-debug-v1` |
-| `build_id` | `crc24:67d633` |
-| `build_id_size` | 8684 |
-| `image_size` | 25529 |
-| `image_sha256` | `1f1480bf12e0657566565dee89e11d0fc0fb8dec1bf551b0471dbfea7f3943f6` |
+| `build_id` | `crc24:500933` |
+| `build_id_size` | 8997 |
+| `image_size` | 26948 |
+| `image_sha256` | `e09f316a5a93fd4c6474aee2d8e6772488ba215610abb254921cff0f14f38592` |
 
 `build_id` is the identity the SWTOS debugger's identity opcode returns, as a
 CRC over the image's immutable range. `crates/swtos-host/src/image.rs` mirrors
@@ -52,7 +59,7 @@ a demo that misreports its own symbols.
 ## Why the debug map is not compiled in
 
 `program.bin` is embedded with `include_bytes!`. The debug map is **not**: at
-1.6 MB it would dwarf a WASM bundle that is otherwise around 126 KB, and
+1.7 MB it would dwarf a WASM bundle that is otherwise around 294 KB, and
 `pages/` is committed, so every rebuild would add another copy of that bulk to
 git history. Only the debugger pane needs the map, and it can fetch it as a
 static asset when it is first opened. The map is embedded in the **test**
