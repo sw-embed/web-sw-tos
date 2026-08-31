@@ -195,9 +195,13 @@ impl Session {
         if self.decoder.mode() == Mode::Framed && self.tick.is_multiple_of(TIME_TICK_INTERVAL) {
             transport::periodic(&mut self.uart, &mut self.desktop, self.tick);
         }
-        // Re-offer HELLO while unnegotiated: the target is not listening
-        // during early boot, so one attempt at startup is not enough.
-        if self.tick >= self.next_hello {
+        // Re-offer HELLO *only while unnegotiated*: the target is not
+        // listening during early boot, so one attempt at startup is not
+        // enough. The mode guard is load-bearing, not defensive -- the target
+        // accepts a repeat HELLO while framed and treats it as a fresh
+        // attach, so re-running autostart and reprinting the menu on every
+        // retry. Dropping this guard produced exactly that loop.
+        if self.decoder.mode() == Mode::Plain && self.tick >= self.next_hello {
             if let Ok(bytes) = hello().encode() {
                 self.uart.send(&bytes, FRAME_BYTE_CYCLES);
             }

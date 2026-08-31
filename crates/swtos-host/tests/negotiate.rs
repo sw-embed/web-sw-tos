@@ -287,3 +287,51 @@ fn oversized_tty_input_frames_are_dropped_by_the_target() {
         "a 17-byte payload was accepted; the target's bound has grown"
     );
 }
+
+/// A repeat HELLO after negotiation restarts the session.
+///
+/// Upstream runs the catalog's autostart programs whenever a frontend
+/// attaches, and the target accepts a fresh HELLO while already framed. A
+/// frontend that keeps retrying therefore re-attaches on every retry,
+/// re-running autostart and reprinting the menu -- which reads as the shell
+/// stuck in a loop. The retry must stop at the first HelloAck.
+#[test]
+fn hello_after_negotiation_restarts_the_session() {
+    fn menus(keep_saying_hello: bool) -> usize {
+        use swtos_frontend::protocol::FrameType;
+
+        let (mut pump, mut uart) = (Pump::default(), VirtualUart::default());
+        let mut decoder = ConnectionDecoder::default();
+        let mut out = String::new();
+        for tick in 0..3000u32 {
+            let plain = decoder.mode() == Mode::Plain;
+            if (plain || keep_saying_hello) && tick % 25 == 0 {
+                uart.send(&hello().encode().expect("bounded"), FRAME_BYTE_CYCLES);
+            }
+            uart.send(&heartbeat_frame(tick), HEARTBEAT_BYTE_CYCLES);
+            pump.run(&mut uart, BATCH);
+            for item in decoder.push(&uart.receive()) {
+                match item {
+                    StreamItem::Plain(bytes) => out.extend(bytes.iter().map(|b| *b as char)),
+                    StreamItem::Frame(frame) if frame.kind == FrameType::TtyOutput => {
+                        out.extend(frame.payload.iter().map(|b| *b as char));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        out.matches("MENU").count()
+    }
+
+    let disciplined = menus(false);
+    let looping = menus(true);
+    println!("menus printed -- stopping at ack: {disciplined}, retrying forever: {looping}");
+    assert!(
+        looping > disciplined,
+        "a repeat HELLO no longer restarts the session; this guard may be unnecessary"
+    );
+    assert!(
+        disciplined <= 3,
+        "the menu repeated even while HELLO stopped at the ack: {disciplined}"
+    );
+}
