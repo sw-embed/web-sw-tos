@@ -1,0 +1,11 @@
+{
+  "task_type": "integration",
+  "state": {
+    "number": 18,
+    "step": "pure-core-crate"
+  },
+  "action": "Diagnosed that both recent defects lived in code no native test could reach because it read js_sys::Date directly, and treated that as the root cause rather than the counts; caught a test of mine that passed vacuously by draining a queue the pump had already consumed, and rewrote the tests to observe effects.",
+  "result": "success",
+  "reward": 1,
+  "timestamp": "2026-08-30T19:17:45"
+}

@@ -1,9 +1,10 @@
 number = 18
 slug = "pure-core-crate"
-status = "in-progress"
+status = "completed"
 description = "Restructure toward the design sw-checklist is a forcing function for, rather ..."
 role = "production"
 context_files = []
 created_at = "2026-08-30T18:55:00"
+completed_at = "2026-08-30T19:17:45"
 task_type = "integration"
-commits = []
+commits = ["5d1195b5958763e01c4307dc2525a084f23d22d6"]
