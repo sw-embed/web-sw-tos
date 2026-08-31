@@ -6,6 +6,18 @@
 
 use swtos_frontend::ui::Desktop;
 
+/// The key name a terminal would be indistinguishable from.
+///
+/// `Ctrl-[` is byte-for-byte Escape, so normalising it once here means every
+/// path that already handles Escape -- closing help, leaving copy mode, the
+/// prefix's own cancel -- accepts it without knowing it exists.
+pub fn normalise(key: &str, ctrl: bool) -> (String, bool) {
+    if ctrl && to_bytes(key, true) == [0x1b] {
+        return ("Escape".to_string(), false);
+    }
+    (key.to_string(), ctrl)
+}
+
 /// Keys that are modifiers in their own right. A browser delivers these as
 /// their own keydown before the character they produce, which a terminal
 /// never does.
@@ -31,8 +43,12 @@ pub fn to_bytes(key: &str, ctrl: bool) -> Vec<u8> {
         ("Backspace", _) => vec![0x08],
         ("Tab", _) => vec![b'\t'],
         ("Escape", _) => vec![0x1b],
+        // A terminal masks Ctrl with the character's low five bits across the
+        // whole `@`..`_` range, which is why `Ctrl-[` and Escape are one byte
+        // and `Ctrl-A` is 0x01. A browser reports the character and a modifier
+        // flag instead, so the conversion has to happen here.
         (name, true) if name.len() == 1 => match name.as_bytes()[0].to_ascii_uppercase() {
-            c @ b'A'..=b'Z' => vec![c - b'A' + 1],
+            c @ b'@'..=b'_' => vec![c & 0x1f],
             _ => Vec::new(),
         },
         (text, false) if text.chars().count() == 1 => text.as_bytes().to_vec(),

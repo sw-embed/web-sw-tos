@@ -21,6 +21,12 @@ cargo test --workspace
 echo "== wasm"
 cargo build --workspace --target wasm32-unknown-unknown
 
+echo "== release binary"
+# The binary target, in release: what build-pages.sh actually deploys. A
+# workspace lib build can succeed while this fails, which is how a broken
+# bundle once reached a commit.
+cargo build --release --target wasm32-unknown-unknown --bin web-sw-tos
+
 echo "== sw-checklist"
 # `sw-checklist` exits non-zero while the vendored crates carry their
 # documented structural exception, so its status cannot be the gate. What must
