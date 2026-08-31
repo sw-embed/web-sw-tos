@@ -63,9 +63,10 @@ fn snapshot(panes: &mut Panes, now: Millis, payload: &[u8]) {
     if !panes.resources.push(payload, now) {
         return;
     }
-    let lines = panes.resources.render(now);
-    panes.desktop.set_resources(&lines);
+    // The built-in monitor pane is retired upstream: `mon` reports as an
+    // ordinary program now, so the snapshot's only job here is to say which
+    // processes are alive.
     if let Some(current) = panes.resources.snapshot() {
-        panes::follow(&mut panes.desktop, current, &mut panes.seen_endpoints);
+        panes::follow(&mut panes.desktop, current);
     }
 }

@@ -30,9 +30,6 @@ pub struct Transport {
 pub struct Panes {
     pub desktop: Desktop,
     pub resources: SnapshotAssembler,
-    /// Endpoints ever seen live, as a bitmask, so a pane that never hosted a
-    /// process is not flagged as having lost one.
-    pub seen_endpoints: u32,
 }
 
 /// Keyboard state that spans more than one key.

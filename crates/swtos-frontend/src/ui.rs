@@ -3,11 +3,12 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/ui.rs
-//!   source commit: 4707342 (committed tree, not the dirty working copy)
-//!   vendored:      2026-08-30
+//!   source commit: e08fa4e (committed tree)
+//!   vendored:      2026-08-31
 //!
-//! Adapted: adds `Cell`, `Color`, `Attrs`, a `render_grid` adapter over
-//! upstream's `render`, and `clear_focused`. See docs/architecture.md.
+//! Adapted: adds `Cell`, `Color`, `Attrs`, and a `render_grid` adapter
+//! over upstream's `render`. Nothing else -- ended panes, clearing, pane
+//! naming and keeping the keyboard are all upstream now.
 
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -86,12 +87,14 @@ impl PaneKind {
     /// reports the same figures as an ordinary process, so several can run at
     /// once and any of them can be killed; this pane is the one that is
     /// simply always there.
-    pub const ALL: [Self; 4] = [
-        Self::Shell,
-        Self::Application,
-        Self::Debugger,
-        Self::Resources,
-    ];
+    /// Panes the frontend creates for itself.
+    ///
+    /// There is no monitor pane: the monitor is the `mon` program, started at
+    /// boot from the catalog's autostart list, so it holds an ordinary slot
+    /// and an ordinary pane. A private pane drawing the same figures could
+    /// not be killed, could not be run twice, and was a second renderer to
+    /// keep in step with the first.
+    pub const ALL: [Self; 3] = [Self::Shell, Self::Application, Self::Debugger];
 
     pub fn title(self) -> &'static str {
         match self {
@@ -123,6 +126,10 @@ pub struct Pane {
     current: String,
     scrollback_limit: usize,
     alert: bool,
+    /// A process held this channel at some point.
+    ran: bool,
+    /// That process has since gone.
+    ended: bool,
     scroll_offset: usize,
     horizontal_offset: usize,
     search: Option<String>,
@@ -138,6 +145,8 @@ impl Pane {
             current: String::new(),
             scrollback_limit,
             alert: false,
+            ran: false,
+            ended: false,
             scroll_offset: 0,
             horizontal_offset: 0,
             search: None,
@@ -186,14 +195,6 @@ impl Pane {
             output.push(&self.current);
         }
         output
-    }
-
-    fn replace(&mut self, lines: &[String]) {
-        self.lines.clear();
-        self.current.clear();
-        for line in lines {
-            self.lines.push_back(line.clone());
-        }
     }
 }
 
@@ -349,6 +350,45 @@ impl Desktop {
         }
     }
 
+    /// Note which endpoints are running, so a pane whose process has gone
+    /// says so instead of looking like one that simply has nothing to add.
+    ///
+    /// Only a pane that has held a process can end. The Application pane
+    /// exists before anything runs on it, and an empty pane is not a dead
+    /// one.
+    pub fn mark_live_endpoints(&mut self, live: &[u8]) {
+        for pane in &mut self.panes {
+            if pane.kind != PaneKind::Application {
+                continue;
+            }
+            let endpoint = u16::from(pane.channel) + 1;
+            let running = u8::try_from(endpoint).is_ok_and(|value| live.contains(&value));
+            if running {
+                pane.ran = true;
+                pane.ended = false;
+            } else if pane.ran {
+                pane.ended = true;
+            }
+        }
+    }
+
+    /// Close every pane whose process has ended, and return how many went.
+    ///
+    /// A long session leaves the grid full of finished programs, each taking
+    /// a share of the screen from the ones still running.
+    pub fn close_ended(&mut self) -> usize {
+        let focused = self.panes.get(self.focus).map(|pane| pane.channel);
+        let before = self.panes.len();
+        self.panes.retain(|pane| !pane.ended);
+        if self.panes.is_empty() {
+            self.restore_system_panes();
+        }
+        self.focus = focused
+            .and_then(|channel| self.panes.iter().position(|pane| pane.channel == channel))
+            .unwrap_or(0);
+        before - self.panes.len()
+    }
+
     /// Name a pane after the process occupying its channel.
     ///
     /// A pane is opened before anything is known about what will speak on it,
@@ -418,12 +458,25 @@ impl Desktop {
         restored
     }
 
-    /// Empty the focused pane. LOCAL ADDITION: upstream has no clear command,
-    /// though docs/use-cases.md documents `Ctrl-A l` for it.
-    pub fn clear_focused(&mut self) {
-        self.panes[self.focus].replace(&[]);
-        self.panes[self.focus].scroll_offset = 0;
-        self.panes[self.focus].horizontal_offset = 0;
+    /// Empty a pane, keeping it open.
+    ///
+    /// A pane accumulates whatever its channel has ever said, which is not
+    /// what a person wants when they start a new program on a channel some
+    /// earlier one used, or when they simply want to read what happens next
+    /// without the last hour above it.
+    pub fn clear(&mut self, index: usize) {
+        if let Some(pane) = self.panes.get_mut(index) {
+            pane.lines.clear();
+            pane.current.clear();
+            pane.scroll_offset = 0;
+            pane.alert = false;
+        }
+    }
+
+    pub fn clear_channel(&mut self, channel: u8) {
+        if let Some(index) = self.panes.iter().position(|pane| pane.channel == channel) {
+            self.clear(index);
+        }
     }
 
     pub fn close_focused(&mut self) {
@@ -485,16 +538,6 @@ impl Desktop {
         self.error = value;
     }
 
-    pub fn set_resources(&mut self, lines: &[String]) {
-        if let Some(pane) = self
-            .panes
-            .iter_mut()
-            .find(|pane| pane.kind == PaneKind::Resources)
-        {
-            pane.replace(lines);
-        }
-    }
-
     pub fn command(&mut self, byte: u8) -> CommandOutcome {
         if byte != b'b' {
             self.broadcast_armed = false;
@@ -510,8 +553,12 @@ impl Desktop {
                 self.zoomed = !self.zoomed;
             }
             b'x' => self.close_focused(),
+            b'l' => self.clear(self.focus),
             b'S' => {
                 self.restore_system_panes();
+            }
+            b'c' => {
+                self.close_ended();
             }
             b'y' => self.copy_mode = !self.copy_mode,
             b'w' => return CommandOutcome::Save,
@@ -537,8 +584,7 @@ impl Desktop {
     /// The screen as a grid of exactly `height` rows of `width` cells.
     ///
     /// Adapts upstream's `render`, stripping the three escapes it emits to
-    /// drive a real terminal. An adapter survives upstream churn that an
-    /// invasive per-cell conversion would not.
+    /// drive a real terminal.
     pub fn render_grid(&self, width: usize, height: usize) -> Vec<Vec<Cell>> {
         let text = self.render(width, height).replace("\x1b[H", "");
         let mut rows: Vec<Vec<Cell>> = text
@@ -573,7 +619,9 @@ impl Desktop {
                     title: "Help",
                     lines: &[
                         "1-9 focus  n next  p previous  z zoom  s split  x close",
-                        "S restore-system-panes  y copy  b,b broadcast",
+                        "l clear pane  c close ended  S restore-system-panes",
+                        "y copy",
+                        "b,b broadcast",
                         "w save  R restore-layout",
                         "copy: arrows/hjkl  PgUp/PgDn  g/G  q exit",
                         "r reconnect/redraw  e target-Escape  ? help  d detach",
@@ -729,13 +777,14 @@ impl Desktop {
         // survives truncation in a narrow column; the endpoint follows for
         // panes that have one.
         format!(
-            "{} v {}{}{}{}",
+            "{} v {}{}{}{}{}",
             index + 1,
             pane.title,
             match pane.kind {
                 PaneKind::Application => format!(" ep={}", u16::from(pane.channel) + 1),
                 _ => String::new(),
             },
+            if pane.ended { " (ended)" } else { "" },
             if pane.alert { " !" } else { "" },
             if index == self.focus { " *" } else { "" }
         )
@@ -897,33 +946,81 @@ mod tests {
         assert_eq!(desktop.focused_channel(), 1);
         desktop.command(b'n');
         assert_eq!(desktop.focused_kind(), PaneKind::Debugger);
-        desktop.command(b'4');
-        assert_eq!(desktop.focused_kind(), PaneKind::Resources);
         assert_eq!(desktop.command(b'd'), CommandOutcome::Detach);
     }
 
     #[test]
     fn closed_system_panes_can_be_restored() {
         let mut desktop = Desktop::new(2);
-        desktop.command(b'4');
-        assert_eq!(desktop.focused_kind(), PaneKind::Resources);
+        desktop.command(b'3');
+        assert_eq!(desktop.focused_kind(), PaneKind::Debugger);
         desktop.command(b'x');
         assert!(
             !desktop
                 .layout()
                 .iter()
-                .any(|(kind, _, _)| *kind == PaneKind::Resources)
+                .any(|(kind, _, _)| *kind == PaneKind::Debugger)
         );
 
         desktop.command(b'S');
         let layout = desktop.layout();
         assert_eq!(layout.len(), PaneKind::ALL.len());
         // Restored at its canonical position, so Ctrl-A 4 still reaches it.
-        desktop.command(b'4');
-        assert_eq!(desktop.focused_kind(), PaneKind::Resources);
+        desktop.command(b'3');
+        assert_eq!(desktop.focused_kind(), PaneKind::Debugger);
         // Restoring again is a no-op rather than a duplicate.
         desktop.command(b'S');
         assert_eq!(desktop.layout().len(), PaneKind::ALL.len());
+    }
+
+    #[test]
+    fn a_pane_says_when_its_process_has_ended_and_can_be_reclaimed() {
+        let mut desktop = Desktop::new(10);
+        desktop.add_application(4, "clock");
+        desktop.push_channel(4, b"00:01\n");
+
+        // Endpoint five is running: the pane is live and says nothing extra.
+        desktop.mark_live_endpoints(&[1, 5]);
+        let screen = desktop.render(100, 24);
+        assert!(screen.contains("clock ep=5"), "{screen}");
+        assert!(!screen.contains("(ended)"), "{screen}");
+
+        // It exits. The pane keeps what it printed and says so.
+        desktop.mark_live_endpoints(&[1]);
+        let screen = desktop.render(100, 24);
+        assert!(screen.contains("clock ep=5 (ended)"), "{screen}");
+        assert!(screen.contains("00:01"), "output must survive: {screen}");
+
+        // A pane that never held a process is not a dead one.
+        assert!(!desktop.render(100, 24).contains("Application ep=2 (ended)"));
+
+        // Reclaiming the space closes it and leaves the rest alone.
+        let before = desktop.pane_count();
+        desktop.command(b'c');
+        assert_eq!(desktop.pane_count(), before - 1);
+        // The footer carries a wall clock of its own; look for the pane.
+        let after = desktop.render(100, 24);
+        assert!(!after.contains("v clock"), "{after}");
+        assert!(desktop.render(100, 24).contains("1 v Shell"));
+    }
+
+    #[test]
+    fn a_pane_can_be_cleared_and_stays_open() {
+        let mut desktop = Desktop::new(10);
+        desktop.push_channel(0, b"old output\n");
+        assert!(desktop.render(80, 24).contains("old output"));
+        desktop.command(b'l');
+        let screen = desktop.render(80, 24);
+        assert!(!screen.contains("old output"), "{screen}");
+        assert!(
+            screen.contains("1 v Shell"),
+            "the pane must stay open: {screen}"
+        );
+
+        // Reusing a channel starts the new program's pane empty.
+        desktop.push_channel(0, b"newer output\n");
+        desktop.clear_channel(0);
+        assert!(!desktop.render(80, 24).contains("newer output"));
     }
 
     #[test]
@@ -965,7 +1062,7 @@ mod tests {
         // on two rules and leave every name half a column to fit in.
         let mut desktop = Desktop::new(4);
         desktop.push_channel(0, b"shell-body\n");
-        desktop.push_channel(3, b"resources-body\n");
+        desktop.push_channel(2, b"debugger-body\n");
         // Strip the cursor-home and clear-to-end controls so a rule is
         // recognisable by its first character wherever it sits.
         let plain = |desktop: &Desktop| {
@@ -991,14 +1088,13 @@ mod tests {
             (left.to_string(), right.to_string())
         };
         let (top_left, top_right) = split(rules[0]);
-        let (low_left, low_right) = split(rules[1]);
+        let (low_left, _low_right) = split(rules[1]);
         assert!(top_left.contains("1 v Shell"), "{top_left}");
         assert!(top_right.contains("2 v Application"), "{top_right}");
         assert!(low_left.contains("3 v Debugger"), "{low_left}");
-        assert!(low_right.contains("4 v Resources"), "{low_right}");
 
         // No name appears twice anywhere on the screen's rules.
-        for name in ["Shell", "Application", "Debugger", "Resources"] {
+        for name in ["Shell", "Application", "Debugger"] {
             let seen: usize = rules.iter().map(|rule| rule.matches(name).count()).sum();
             assert_eq!(seen, 1, "{name} named {seen} times");
         }
@@ -1014,13 +1110,13 @@ mod tests {
             "{screen}"
         );
 
-        desktop.command(b'4');
+        desktop.command(b'3');
         let screen = plain(&desktop);
         let rules: Vec<&str> = screen
             .lines()
             .filter(|line| line.starts_with('-'))
             .collect();
-        assert!(rules[1].contains("4 v Resources *"), "{}", rules[1]);
+        assert!(rules[1].contains("3 v Debugger *"), "{}", rules[1]);
         assert!(!rules[0].contains("1 v Shell *"), "{}", rules[0]);
     }
 
@@ -1036,7 +1132,7 @@ mod tests {
         assert!(large.contains("application"));
         let small = desktop.render(40, 12);
         assert!(small.contains("Shell *"));
-        assert!(small.contains("Resources"));
+        assert!(small.contains("Debugger"));
     }
 
     #[test]
@@ -1069,11 +1165,11 @@ mod tests {
     fn dynamic_layout_search_alerts_and_guarded_broadcast() {
         let mut desktop = Desktop::default();
         desktop.add_application(7, "Counter");
-        assert_eq!(desktop.pane_count(), 5);
+        assert_eq!(desktop.pane_count(), 4);
         desktop.command(b'1');
         desktop.push_channel(7, b"count 1\ncount 2\n");
         assert!(desktop.render(80, 24).contains("Counter ep=8 !"));
-        desktop.command(b'5');
+        desktop.command(b'4');
         assert!(desktop.search("count 1"));
         assert!(!desktop.broadcast_enabled());
         desktop.command(b'b');
@@ -1086,9 +1182,9 @@ mod tests {
         let saved = desktop.layout();
         desktop.close_focused();
         desktop.restore_layout(&saved);
-        assert_eq!(desktop.pane_count(), 5);
-        desktop.release_channel(7);
         assert_eq!(desktop.pane_count(), 4);
+        desktop.release_channel(7);
+        assert_eq!(desktop.pane_count(), 3);
     }
 
     #[test]

@@ -65,10 +65,6 @@ fn prefix(session: &mut Session, key: &str, ctrl: bool) -> Option<Vec<u8>> {
 /// Run one frontend command. Prefix-`e` is the exception that reaches the
 /// target: it is how a running application is sent a real Escape.
 fn command(session: &mut Session, key: &str) -> Vec<u8> {
-    if key == "l" || key == "c" {
-        session.panes.desktop.clear_focused();
-        return Vec::new();
-    }
     if key == "e" {
         let channel = session.panes.desktop.focused_channel();
         sending::to_channel(session, channel, &[0x1b]);

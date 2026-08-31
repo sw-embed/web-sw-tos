@@ -3,8 +3,8 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/protocol.rs
-//!   source commit: 4707342 (committed tree, not the dirty working copy)
-//!   vendored:      2026-08-30
+//!   source commit: e08fa4e (committed tree)
+//!   vendored:      2026-08-31
 //!
 //! Vendored unmodified.
 

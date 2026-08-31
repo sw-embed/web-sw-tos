@@ -3,8 +3,8 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/debug.rs
-//!   source commit: 4707342 (committed tree, not the dirty working copy)
-//!   vendored:      2026-08-30
+//!   source commit: e08fa4e (committed tree)
+//!   vendored:      2026-08-31
 //!
 //! Adapted: `DebugMap::load(path)` replaced by `from_json`. There is no
 //! filesystem here; the browser fetches the map as a static asset.
@@ -51,8 +51,8 @@ pub struct DebugMap {
 
 impl DebugMap {
     /// Parse a debug map. Upstream reads it from a path; there is no
-    /// filesystem in a browser, so the caller fetches it as a static asset.
-    /// Named `from_json` so it is not mistaken for `std::str::FromStr`.
+    /// filesystem in a browser. Named `from_json` so it is not mistaken for
+    /// `std::str::FromStr`.
     pub fn from_json(contents: &str) -> Result<Self, String> {
         let map: Self = serde_json::from_str(contents)
             .map_err(|error| format!("invalid debug map: {error}"))?;
@@ -199,6 +199,12 @@ const SRAM_END: u32 = 0x000F_FFFF;
 pub struct DebugConsole {
     pub map: Option<DebugMap>,
     target_build_id: Option<u32>,
+    /// Address a memory read was issued for on behalf of `dis`.
+    ///
+    /// Disassembly outside the image reads the bytes and decodes them, which
+    /// takes a round trip; this remembers what the answer is for so the reply
+    /// is rendered as instructions rather than as a hex dump.
+    pending_disassembly: Option<(u32, usize)>,
 }
 
 pub struct CommandResult {
@@ -211,6 +217,7 @@ impl DebugConsole {
         Self {
             map,
             target_build_id: None,
+            pending_disassembly: None,
         }
     }
 
@@ -243,6 +250,11 @@ impl DebugConsole {
             }
             [3, a0, a1, a2, data @ ..] => {
                 let address = u24(&[*a0, *a1, *a2]);
+                if let Some((wanted, count)) = self.pending_disassembly.take()
+                    && wanted == address
+                {
+                    return disassemble_bytes(address, data, count);
+                }
                 vec![format!(
                     "{address:06x}: {}",
                     data.iter()
@@ -322,7 +334,7 @@ impl DebugConsole {
         }
     }
 
-    pub fn command(&self, line: &str, resources: Option<&ResourceSnapshot>) -> CommandResult {
+    pub fn command(&mut self, line: &str, resources: Option<&ResourceSnapshot>) -> CommandResult {
         let words: Vec<&str> = line.split_whitespace().collect();
         let result = match words.as_slice() {
             ["map"] => self.map_command(resources, "all"),
@@ -529,7 +541,7 @@ impl DebugConsole {
         )))
     }
 
-    fn disassemble_command(&self, value: &str, count: usize) -> Result<CommandResult, String> {
+    fn disassemble_command(&mut self, value: &str, count: usize) -> Result<CommandResult, String> {
         let address = self.address(value)?;
         let lines: Vec<String> = self
             .matched_map()?
@@ -538,15 +550,20 @@ impl DebugConsole {
             .map(|item| format!("{:06x} {:<8} {}", item.address, item.bytes, item.text))
             .collect();
         if lines.is_empty() {
-            // An address outside the image disassembles to nothing. Saying so
-            // matters because the addresses an operator pastes in come from
-            // `regs`, which reports a stale program counter for an endpoint
-            // that has exited, and silence reads as a broken command.
-            return Err(match self.matched_map()?.mapped_extent() {
-                Some((low, high)) => {
-                    format!("no instructions at {address:06x}; image maps {low:06x}-{high:06x}")
-                }
-                None => format!("no instructions at {address:06x}"),
+            // Outside the image the map knows nothing, which is exactly where
+            // a spawned process runs: its program counter points into a
+            // private copy in the arena. Read the bytes and decode them --
+            // instructions are decodable without a map, only their names and
+            // source lines are not.
+            // One memory read carries twelve bytes, which is three long
+            // instructions or a dozen short ones. Disassemble that window and
+            // let the reader ask for the next address; a queue of reads would
+            // buy a longer listing and a lot of state to lose track of.
+            const WINDOW: u8 = 12;
+            self.pending_disassembly = Some((address, count.min(WINDOW as usize)));
+            return Ok(CommandResult {
+                lines: vec![format!("decoding {WINDOW} bytes at {address:06x}")],
+                request: Some(memory_request(address, WINDOW)?),
             });
         }
         Ok(CommandResult {
@@ -562,6 +579,32 @@ impl DebugConsole {
             request: Some(memory_request(address, length)?),
         })
     }
+}
+
+/// Render read bytes as instructions.
+fn disassemble_bytes(address: u32, data: &[u8], count: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut offset = 0;
+    while lines.len() < count && offset < data.len() {
+        let at = address.wrapping_add(offset as u32) & 0x00FF_FFFF;
+        match crate::disasm::decode(&data[offset..], at) {
+            Some(decoded) => {
+                let bytes: String = data[offset..offset + decoded.size]
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect();
+                lines.push(format!("{at:06x} {bytes:<8} {}", decoded.text));
+                offset += decoded.size;
+            }
+            // A window ends mid-instruction, which is not an error: ask for
+            // more from where it stopped.
+            None => break,
+        }
+    }
+    if lines.is_empty() {
+        lines.push(format!("no instruction decoded at {address:06x}"));
+    }
+    lines
 }
 
 fn text(value: &str) -> CommandResult {
@@ -621,16 +664,27 @@ mod tests {
     }
 
     #[test]
-    fn disassembling_outside_the_image_says_so_instead_of_printing_nothing() {
+    fn disassembling_outside_the_image_reads_and_decodes_the_bytes() {
         let mut console = DebugConsole::new(Some(map()));
         console.response(&[1, 0x56, 0x34, 0x12]);
-        // An operator reaches an address like this by pasting the program
-        // counter `regs` reports for an endpoint that has already exited.
+        // A spawned process runs a private copy of an image in the arena, so
+        // its program counter is an address the map has never heard of. That
+        // is decodable: read the bytes and decode them.
         let result = console.command("dis fee7db 20", None);
         assert!(
-            result.lines.iter().any(|line| line.contains("fee7db")),
-            "an empty range must be reported, got {:?}",
+            result.request.is_some(),
+            "an unmapped address must be read from the target, got {:?}",
             result.lines
+        );
+        // The reply is instructions, not a hex dump: 44 01 is "lc r0,1".
+        let decoded = console.response(&[3, 0xdb, 0xe7, 0xfe, 0x44, 0x01, 0x66]);
+        assert!(
+            decoded.iter().any(|line| line.contains("lc r0,1")),
+            "expected decoded instructions, got {decoded:?}"
+        );
+        assert!(
+            decoded.iter().any(|line| line.contains("mov sp,r0")),
+            "expected the window to continue, got {decoded:?}"
         );
         // A real range still disassembles.
         let good = console.command("dis 10 2", None);

@@ -12,7 +12,7 @@ fn kill_a_spawned_process() {
     let mut decoder = ConnectionDecoder::default();
     let mut console = DebugConsole::new(None);
     let (mut shell, mut dbg) = (String::new(), Vec::new());
-    let (mut closes, mut monitor) = (Vec::new(), Vec::new());
+    let mut closes = Vec::new();
     let mut resources = swtos_frontend::resource::SnapshotAssembler::default();
     let mut now = 0.0f64;
     let (mut spawned, mut killed, mut checked) = (false, false, false);
@@ -80,8 +80,8 @@ fn kill_a_spawned_process() {
                             closes.push(frame.channel);
                         }
                     }
-                    FrameType::ResourceSnapshot if resources.push(&frame.payload, now) => {
-                        monitor = resources.render(now);
+                    FrameType::ResourceSnapshot => {
+                        resources.push(&frame.payload, now);
                     }
                     _ => {}
                 }
@@ -103,20 +103,34 @@ fn kill_a_spawned_process() {
             .collect();
         println!("--- endpoints in the final snapshot: {live:?}");
     }
-    let report = monitor.join("\n");
-    println!("--- monitor pane after kill ---\n{report}");
+    // The frontend's monitor pane is retired upstream; the snapshot itself is
+    // now the record of what is running.
+    let live: Vec<String> = resources
+        .snapshot()
+        .map(|snap| {
+            snap.processes
+                .values()
+                .filter(|process| process.state != 0)
+                .map(|process| format!("ep={} {}", process.endpoint, process.name))
+                .collect()
+        })
+        .unwrap_or_default();
+    println!("--- running after kill ---\n{live:?}");
 
     assert!(
         dbg.iter().any(|line| line.contains("kill requested")),
         "the target refused the kill: {dbg:?}"
     );
+    // Either shape means gone. sw-tos e08fa4e made a released slot forget
+    // what ran in it, so `ps -l` now omits the row entirely where it used to
+    // show the old name with state=0.
     assert!(
-        ps.contains("state=0"),
+        ps.contains("state=0") || ps == "(no ep=2 row)" || ps.contains("name=none"),
         "endpoint 2 is still running after kill: {ps}"
     );
     assert!(
-        !report.contains("ep=2"),
-        "a killed process is still listed in the monitor: {report}"
+        !live.iter().any(|row| row.starts_with("ep=2 ")),
+        "a killed process is still listed as running: {live:?}"
     );
     assert!(
         closes.is_empty() || !closes.contains(&0),

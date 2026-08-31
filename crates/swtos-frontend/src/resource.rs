@@ -3,8 +3,8 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/resource.rs
-//!   source commit: 4707342 (committed tree, not the dirty working copy)
-//!   vendored:      2026-08-30
+//!   source commit: e08fa4e (committed tree)
+//!   vendored:      2026-08-31
 //!
 //! Adapted: `Instant` replaced by `Millis` (an `f64`) supplied by the
 //! caller. `Instant::now()` panics on wasm32-unknown-unknown.
@@ -13,11 +13,11 @@ use std::collections::BTreeMap;
 /// A monotonic timestamp in milliseconds, supplied by the caller.
 ///
 /// Upstream uses `std::time::Instant`, whose `now()` panics on
-/// wasm32-unknown-unknown. A caller-supplied clock is also more testable.
+/// wasm32-unknown-unknown, and a caller-supplied clock is more testable.
 pub type Millis = f64;
 
 /// How long a snapshot may go without an update before it is shown as stale.
-const STALE_AFTER: Millis = 1000.0;
+pub const STALE_AFTER: Millis = 1000.0;
 
 const BEGIN: u8 = 1;
 const MEMORY: u8 = 2;
@@ -180,60 +180,6 @@ impl SnapshotAssembler {
                 .any(|process| process.name.starts_with(prefix))
         })
     }
-
-    pub fn render(&self, now: Millis) -> Vec<String> {
-        let Some(snapshot) = &self.current else {
-            return vec!["resource data unavailable".into()];
-        };
-        let stale = self
-            .updated
-            .is_none_or(|updated| now - updated > STALE_AFTER);
-        let marker = if stale { "STALE " } else { "" };
-        // "stk" is the SRAM stack region, "heap" the loaded-image and state
-        // arena above the linked image. Reporting only one of them hides
-        // whichever is filling up.
-        let mut lines = vec![format!(
-            "{marker}stk {}/{}B heap {}/{}B kstk={}B fail={} slots={}/{}",
-            snapshot.memory.current,
-            snapshot.memory.peak,
-            snapshot.memory.heap_current,
-            snapshot.memory.heap_peak,
-            snapshot.memory.kernel_stack_peak,
-            snapshot.memory.allocation_failures,
-            snapshot.memory.used_slots,
-            snapshot.memory.total_slots
-        )];
-        for process in snapshot.processes.values() {
-            lines.push(format!(
-                // Pad the name so the columns after it line up. A longer name
-                // pushes its own row rather than being cut: losing the end of
-                // "embedded-hello" is what made the four-byte field useless.
-                "{:<8} ep={} s={} b={} alloc={}/{}w d={} y={} fp={} cpu={} ipc={} io={}/{}",
-                if process.name.is_empty() {
-                    "-"
-                } else {
-                    &process.name
-                },
-                process.endpoint,
-                process.state,
-                process.blocked,
-                process.stack_words,
-                process.state_words,
-                process.dispatches,
-                process.yields,
-                process.forced_preemptions,
-                process.cpu_progress,
-                process.ipc,
-                process.tty_in,
-                process.tty_out
-            ));
-        }
-        lines.push(format!(
-            "uart rx={} tx={} protocol-errors={}",
-            snapshot.uart_rx, snapshot.uart_tx, snapshot.protocol_errors
-        ));
-        lines
-    }
 }
 
 fn u24(bytes: &[u8]) -> u32 {
@@ -244,6 +190,10 @@ fn u24(bytes: &[u8]) -> u32 {
 mod tests {
     use super::*;
 
+    /// The frontend no longer draws this report -- the mon program does --
+    /// so what matters is the snapshot: which processes exist and what they
+    /// are called. That decides which clock ticks are sent and what each
+    /// pane is named.
     #[test]
     fn commits_only_a_complete_matching_generation() {
         let now: Millis = 0.0;
@@ -263,27 +213,34 @@ mod tests {
         );
         assert!(!assembler.push(&[END, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0], now));
         assert!(assembler.push(&[END, 7, 2, 0, 0, 8, 0, 0, 9, 0, 0], now));
-        let lines = assembler.render(now);
-        assert!(lines.iter().any(|line| line.contains("stk 10/20B")));
-        assert!(
-            lines
-                .iter()
-                .any(|line| line.contains("cntr     ep=2 s=7 b=1 alloc=192/1w d=9"))
-        );
-        assert!(lines.iter().any(|line| line.contains("fp=11")));
-        assert!(lines.iter().any(|line| line.contains("cpu=42")));
+
+        let snapshot = assembler.snapshot().expect("a complete generation");
+        assert_eq!(snapshot.memory.current, 10);
+        assert_eq!(snapshot.memory.used_slots, 2);
+        let process = &snapshot.processes[&2];
+        assert_eq!(process.name, "cntr");
+        assert_eq!(process.state, 7);
+        assert_eq!(process.dispatches, 9);
+        assert_eq!(process.forced_preemptions, 11);
+        assert_eq!(process.cpu_progress, 42);
+        assert!(assembler.has_process_named("cnt"));
     }
 
     #[test]
-    fn stale_and_disconnected_are_not_valid_zeroes() {
+    fn nothing_is_published_before_a_generation_completes() {
         let now: Millis = 0.0;
         let mut assembler = SnapshotAssembler::default();
-        assert_eq!(assembler.render(now), ["resource data unavailable"]);
+        assert!(assembler.snapshot().is_none());
         assembler.push(&[BEGIN, 1], now);
+        assert!(
+            assembler.snapshot().is_none(),
+            "a begun generation is not one"
+        );
         assembler.push(&[END, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], now);
-        assert!(assembler.render(now + 2.0 * STALE_AFTER)[0].starts_with("STALE"));
+        assert!(assembler.snapshot().is_some());
+        // A lost link must not leave the last figures standing as current.
         assembler.disconnect();
-        assert_eq!(assembler.render(now), ["resource data unavailable"]);
+        assert!(assembler.snapshot().is_none());
     }
 
     #[test]
@@ -302,21 +259,16 @@ mod tests {
             now,
         );
         assembler.push(&[END, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], now);
-        assert!(
-            assembler
-                .render(now)
-                .iter()
-                .any(|line| line.contains("app      ep=2"))
-        );
+        assert!(assembler.has_process_named("app"));
 
+        // The next generation stands alone: a process that has exited must
+        // not survive in it because an earlier one mentioned it.
         assembler.push(&[BEGIN, 2], now);
-        assembler.push(
-            &[MEMORY, 2, 10, 0, 0, 40, 0, 0, 2, 0, 0, 0, 0, 0, 1, 3],
-            now,
-        );
+        assembler.push(&[MEMORY, 2, 5, 0, 0, 40, 0, 0, 2, 0, 0, 0, 0, 0, 1, 3], now);
         assembler.push(&[END, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0], now);
-        let lines = assembler.render(now);
-        assert!(lines[0].contains("stk 10/40B"));
-        assert!(!lines.iter().any(|line| line.contains("ep=2")));
+        let snapshot = assembler.snapshot().expect("the newer generation");
+        assert!(snapshot.processes.is_empty(), "{:?}", snapshot.processes);
+        assert_eq!(snapshot.memory.current, 5);
+        assert!(!assembler.has_process_named("app"));
     }
 }

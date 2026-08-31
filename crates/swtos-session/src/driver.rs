@@ -66,7 +66,6 @@ pub fn session() -> Session {
         panes: Panes {
             desktop: Default::default(),
             resources: Default::default(),
-            seen_endpoints: 0,
         },
         input: Input {
             prefix_armed: false,

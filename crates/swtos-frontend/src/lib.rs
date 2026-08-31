@@ -6,6 +6,7 @@
 //! carries it. See `docs/plan.md` for the per-module triage.
 
 pub mod debug;
+pub mod disasm;
 pub mod protocol;
 pub mod resource;
 pub mod ui;

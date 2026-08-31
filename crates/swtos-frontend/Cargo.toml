@@ -7,5 +7,6 @@ license = "MIT"
 description = "Vendored SWTOS terminal frontend core for the browser demo"
 
 [dependencies]
+cor24-isa = { path = "../../../sw-cor24-isa" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

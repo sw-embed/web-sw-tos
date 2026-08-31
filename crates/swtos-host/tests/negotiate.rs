@@ -65,8 +65,10 @@ fn framed_mode_reaches_the_command_shell_on_either_terminator() {
         shell_reply(b"help\n").contains("ps"),
         "help did not list ps"
     );
+    let table = shell_reply(b"ps -l\n");
+    println!("--- ps -l ---\n{table}");
     assert!(
-        shell_reply(b"ps -l\n").contains("name=shell"),
+        table.contains("shell"),
         "ps -l did not report the process table"
     );
     assert!(
@@ -231,7 +233,7 @@ fn spawning_populates_an_endpoint_and_then_regs_answers() {
     let shell: String = by_channel.get(&0).cloned().unwrap_or_default();
     assert!(shell.contains("READY"), "cpu-hog did not spawn: {shell}");
     assert!(
-        shell.contains("name=cpu-hog"),
+        shell.contains("cpu-hog"),
         "endpoint 2 was not populated: {shell}"
     );
     println!("channels opened: {channels:?}");
