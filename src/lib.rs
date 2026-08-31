@@ -5,7 +5,6 @@ use gloo::events::EventListener;
 use gloo::timers::callback::Timeout;
 use js_sys::Date;
 use swtos_session::state::Session;
-use wasm_bindgen::JsCast;
 use web_sys::HtmlSelectElement;
 use yew::prelude::*;
 
@@ -66,19 +65,7 @@ impl Component for App {
     fn create(ctx: &Context<Self>) -> Self {
         let link = ctx.link().clone();
         let listener = browser::on_keydown(ctx.link().clone());
-        // The debug map is fetched rather than compiled in: at 1.6 MB it
-        // would dwarf the WASM module and be re-committed to pages/ on every
-        // rebuild. Same-origin, so the demo stays fully client-side.
-        let loader = ctx.link().clone();
-        wasm_bindgen_futures::spawn_local(async move {
-            if let Ok(response) = gloo::net::http::Request::get("program.debug.json")
-                .send()
-                .await
-                && let Ok(text) = response.text().await
-            {
-                loader.send_message(Msg::MapLoaded(text));
-            }
-        });
+        browser::fetch_debug_map(ctx.link().clone());
         let resize = browser::on_resize(ctx.link().clone());
         Self {
             session: swtos_session::build::session(),

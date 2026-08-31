@@ -3,10 +3,10 @@
 use crate::{App, Msg};
 use gloo::events::EventListener;
 use swtos_frontend::resource::Millis;
+use swtos_session::state::{Clock, LocalTime};
 use wasm_bindgen::JsCast;
 use web_sys::KeyboardEvent;
 use yew::html::Scope;
-use swtos_session::state::{Clock, LocalTime};
 
 /// Time from the browser. The only implementation that touches `js_sys`;
 /// tests supply their own.
@@ -58,7 +58,9 @@ pub fn on_resize(link: Scope<App>) -> EventListener {
 /// rebuild. Same-origin, so the demo stays fully client-side.
 pub fn fetch_debug_map(link: Scope<App>) {
     wasm_bindgen_futures::spawn_local(async move {
-        if let Ok(response) = gloo::net::http::Request::get("program.debug.json").send().await
+        if let Ok(response) = gloo::net::http::Request::get("program.debug.json")
+            .send()
+            .await
             && let Ok(text) = response.text().await
         {
             link.send_message(Msg::MapLoaded(text));

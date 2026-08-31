@@ -11,21 +11,21 @@ use swtos_session::routing::SHELL;
 use swtos_session::state::Session;
 use swtos_session::{debugger, sending};
 
+/// Keys the help overlay claims for itself, taken without the prefix because
+/// the overlay tells the reader to press exactly these.
+const DISMISS_HELP: [&str; 3] = ["q", "Escape", "?"];
+
 /// Handle one key. Returns whatever was queued for the target, empty when the
 /// frontend consumed it.
 pub fn key(session: &mut Session, key: &str, ctrl: bool) -> Vec<u8> {
-    // A bare modifier keydown is neither a command nor input. Without this it
-    // is consumed as the prefix command, so every binding needing Shift --
-    // `?` for help, `S` to restore a pane -- is swallowed by the Shift that
-    // produces it. A terminal never sees this; only a browser does.
-    if translate::is_modifier(key) {
-        return Vec::new();
+    if let Some(consumed) = prefix(session, key, ctrl) {
+        return consumed;
     }
-    if core::mem::take(&mut session.input.prefix_armed) {
-        return command(session, key);
-    }
-    if ctrl && key.eq_ignore_ascii_case("a") {
-        session.input.prefix_armed = true;
+    // The overlay says "close help: q, Escape, or ?", so those three reach the
+    // command table directly while it is open. Requiring the prefix here left
+    // the overlay with no documented way out at all.
+    if session.panes.desktop.help_enabled() && DISMISS_HELP.contains(&key) {
+        session.panes.desktop.command(translate::command_byte(key));
         return Vec::new();
     }
     if session.panes.desktop.copy_mode_enabled()
@@ -37,6 +37,27 @@ pub fn key(session: &mut Session, key: &str, ctrl: bool) -> Vec<u8> {
         return Vec::new();
     }
     to_target(session, key, ctrl)
+}
+
+/// The prefix state machine: drop bare modifiers, run a pending command, or
+/// arm on Ctrl-A. `Some` means the key was consumed here.
+///
+/// A bare modifier keydown is neither a command nor input. Without dropping
+/// it, it is consumed as the prefix command, so every binding needing Shift --
+/// `?` for help, `S` to restore a pane -- is swallowed by the Shift that
+/// produces it. A terminal never sees this; only a browser does.
+fn prefix(session: &mut Session, key: &str, ctrl: bool) -> Option<Vec<u8>> {
+    if translate::is_modifier(key) {
+        return Some(Vec::new());
+    }
+    if core::mem::take(&mut session.input.prefix_armed) {
+        return Some(command(session, key));
+    }
+    if ctrl && key.eq_ignore_ascii_case("a") {
+        session.input.prefix_armed = true;
+        return Some(Vec::new());
+    }
+    None
 }
 
 /// Run one frontend command. Prefix-`e` is the exception that reaches the
