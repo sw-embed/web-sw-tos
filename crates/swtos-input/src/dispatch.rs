@@ -18,6 +18,8 @@ const DISMISS_HELP: [&str; 3] = ["q", "Escape", "?"];
 /// Handle one key. Returns whatever was queued for the target, empty when the
 /// frontend consumed it.
 pub fn key(session: &mut Session, key: &str, ctrl: bool) -> Vec<u8> {
+    let (key, ctrl) = translate::normalise(key, ctrl);
+    let key = key.as_str();
     if let Some(consumed) = prefix(session, key, ctrl) {
         return consumed;
     }

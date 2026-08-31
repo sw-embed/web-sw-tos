@@ -308,13 +308,17 @@ becomes two in-process byte queues. Preemption stays host-driven: a five-byte
 Edition 2024. Never suppress warnings.
 
 ```bash
-trunk build                                               # dev build to dist/
-./scripts/serve.sh                                        # dev server
-./scripts/build-pages.sh                                  # release -> pages/
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo fmt -p web-sw-tos -p swtos-frontend -p swtos-host   # NOT --all; see below
-sw-checklist
+trunk build                # dev build to dist/
+./scripts/serve.sh         # dev server
+./scripts/build-pages.sh   # release -> pages/
+./scripts/gate.sh          # the whole pre-commit gate; exits non-zero on any failure
 ```
+
+Run `./scripts/gate.sh`, not the individual commands chained with `&&`. Twice
+a chain of `&& echo PASS` swallowed a failing step and reported green, because
+a pipe's exit status is the last stage's. The script exits non-zero on any
+failure, tolerates `sw-checklist`'s expected non-zero status from the vendored
+crates, and fails on any finding in a crate we author.
 
 ### NEVER run `cargo fmt --all` in this repo
 
