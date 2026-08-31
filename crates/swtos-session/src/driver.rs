@@ -3,9 +3,10 @@
 use crate::debugger;
 use crate::routing;
 use crate::sending;
-use crate::state::{Clock, Session, Status};
+use crate::state::{Clock, Input, Panes, Session, Status, Transport};
 use swtos_frontend::protocol::Mode;
 use swtos_frontend::resource::Millis;
+use swtos_host::pump::Pump;
 use swtos_host::uart::HEARTBEAT_BYTE_CYCLES;
 
 /// Cycles to run per tick beyond the heartbeat's own pacing.
@@ -50,5 +51,28 @@ pub fn status(session: &Session) -> Status {
         log_entries: session.pump.log_len(),
         framed: session.transport.decoder.mode() == Mode::Framed,
         prefix_armed: session.input.prefix_armed,
+    }
+}
+
+/// A session with the vendored image loaded and nothing negotiated yet.
+pub fn session() -> Session {
+    Session {
+        pump: Pump::default(),
+        transport: Transport {
+            uart: Default::default(),
+            decoder: Default::default(),
+            next_hello: 0,
+        },
+        panes: Panes {
+            desktop: Default::default(),
+            resources: Default::default(),
+            seen_endpoints: 0,
+        },
+        input: Input {
+            prefix_armed: false,
+        },
+        console: crate::debugger::console(),
+        tick: 0,
+        greeted: false,
     }
 }

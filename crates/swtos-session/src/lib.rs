@@ -10,9 +10,9 @@
 //! Data declarations live in [`state`]; behaviour lives in the modules that
 //! operate on them, as functions rather than methods hung off the data.
 
-pub mod build;
 pub mod debugger;
 pub mod driver;
+pub mod panes;
 pub mod routing;
 pub mod sending;
 pub mod state;

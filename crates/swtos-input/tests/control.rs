@@ -6,7 +6,7 @@
 //! instead, so the frontend has to do that conversion itself.
 
 use swtos_input::{dispatch, translate};
-use swtos_session::build;
+use swtos_session::driver;
 
 #[test]
 fn ctrl_bracket_is_escape() {
@@ -42,7 +42,7 @@ fn ctrl_covers_the_full_control_range() {
 /// Ctrl-[ closes the help overlay, exactly as Escape does.
 #[test]
 fn ctrl_bracket_closes_help() {
-    let mut session = build::session();
+    let mut session = driver::session();
     dispatch::key(&mut session, "a", true);
     dispatch::key(&mut session, "?", false);
     assert!(session.panes.desktop.help_enabled(), "help did not open");
@@ -57,7 +57,7 @@ fn ctrl_bracket_closes_help() {
 /// And leaves copy mode, again as Escape does.
 #[test]
 fn ctrl_bracket_leaves_copy_mode() {
-    let mut session = build::session();
+    let mut session = driver::session();
     dispatch::key(&mut session, "a", true);
     dispatch::key(&mut session, "y", false);
     assert!(

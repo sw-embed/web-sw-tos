@@ -5,8 +5,8 @@
 //! debugger does nothing". These pin that the console handles the keys itself.
 
 use swtos_frontend::ui::Desktop;
+use swtos_session::debugger;
 use swtos_session::state::Console;
-use swtos_session::{build, debugger};
 
 fn type_line(console: &mut Console, desktop: &mut Desktop, line: &str) -> Option<Vec<u8>> {
     for ch in line.chars() {
@@ -40,7 +40,7 @@ fn render(desktop: &Desktop, cols: usize, rows: usize) -> String {
 
 #[test]
 fn help_prints_the_command_list_into_the_pane() {
-    let (mut console, mut desktop) = (build::console(), Desktop::default());
+    let (mut console, mut desktop) = (debugger::console(), Desktop::default());
     assert!(type_line(&mut console, &mut desktop, "help").is_none());
     let text = screen(&mut desktop);
     assert!(text.contains("regs"), "help did not list regs: {text}");
@@ -55,7 +55,7 @@ fn help_prints_the_command_list_into_the_pane() {
 /// `regs 2` must produce a DEBUG_REQUEST for the target, not screen text.
 #[test]
 fn regs_produces_a_request_for_the_target() {
-    let (mut console, mut desktop) = (build::console(), Desktop::default());
+    let (mut console, mut desktop) = (debugger::console(), Desktop::default());
     let request = type_line(&mut console, &mut desktop, "regs 2");
     assert_eq!(
         request,
@@ -68,7 +68,7 @@ fn regs_produces_a_request_for_the_target() {
 /// into the bundle. They must say so rather than appear broken.
 #[test]
 fn symbolic_commands_report_the_missing_map() {
-    let (mut console, mut desktop) = (build::console(), Desktop::default());
+    let (mut console, mut desktop) = (debugger::console(), Desktop::default());
     type_line(&mut console, &mut desktop, "dis 1000");
     let text = screen(&mut desktop);
     assert!(
@@ -82,7 +82,7 @@ fn symbolic_commands_report_the_missing_map() {
 /// than parsed as a debugger command.
 #[test]
 fn a_bang_line_is_handed_to_the_shell() {
-    let (mut console, mut desktop) = (build::console(), Desktop::default());
+    let (mut console, mut desktop) = (debugger::console(), Desktop::default());
     assert!(type_line(&mut console, &mut desktop, "!ps -l").is_none());
     assert_eq!(
         console.pending.take().as_deref(),
@@ -98,7 +98,7 @@ fn a_bang_line_is_handed_to_the_shell() {
 /// An ordinary debugger command must not be mistaken for a shell command.
 #[test]
 fn a_plain_command_is_not_passed_to_the_shell() {
-    let (mut console, mut desktop) = (build::console(), Desktop::default());
+    let (mut console, mut desktop) = (debugger::console(), Desktop::default());
     type_line(&mut console, &mut desktop, "regs 2");
     assert!(console.pending.take().is_none());
 }

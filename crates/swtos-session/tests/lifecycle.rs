@@ -8,9 +8,8 @@
 
 use swtos_frontend::protocol::{Frame, FrameType, StreamItem};
 use swtos_frontend::ui::Desktop;
-use swtos_session::build;
-use swtos_session::routing::{self, ENDED};
 use swtos_session::state::Panes;
+use swtos_session::{debugger, panes, routing};
 
 fn output(channel: u8, text: &str) -> StreamItem {
     StreamItem::Frame(Frame {
@@ -38,7 +37,7 @@ fn screen(desktop: &Desktop) -> String {
 }
 
 fn feed(desktop: &mut Desktop, items: Vec<StreamItem>) {
-    let mut console = build::console();
+    let mut console = debugger::console();
     let mut panes = Panes {
         desktop: core::mem::take(desktop),
         resources: Default::default(),
@@ -65,7 +64,7 @@ fn a_closed_channel_keeps_its_pane_and_is_marked_ended() {
         "closing the channel destroyed the program's output: {text}"
     );
     assert!(
-        text.contains(ENDED.trim()),
+        text.contains(panes::ENDED.trim()),
         "an ended pane was not flagged: {text}"
     );
 }
@@ -103,7 +102,7 @@ fn reusing_an_ended_channel_clears_the_pane() {
         "the reused pane still held the previous program's output: {text}"
     );
     assert!(
-        !text.contains(ENDED.trim()),
+        !text.contains(panes::ENDED.trim()),
         "the reused pane is still flagged ended: {text}"
     );
 }
@@ -192,22 +191,22 @@ fn a_pane_is_flagged_when_its_process_leaves_the_snapshot() {
     // Channel 1 carries endpoint 2, which is te-rs's own convention.
     feed(&mut desktop, vec![output(1, "mon report\n")]);
 
-    routing::follow(&mut desktop, &snapshot_with(2, "mon", 1), &mut seen);
+    panes::follow(&mut desktop, &snapshot_with(2, "mon", 1), &mut seen);
     let named = screen(&desktop);
     assert!(
         named.contains("mon"),
         "pane not named from the snapshot: {named}"
     );
     assert!(
-        !named.contains(ENDED.trim()),
+        !named.contains(panes::ENDED.trim()),
         "a live process was flagged ended"
     );
 
     // The process is killed: endpoint 2 vanishes from the snapshot entirely.
-    routing::follow(&mut desktop, &ResourceSnapshot::default(), &mut seen);
+    panes::follow(&mut desktop, &ResourceSnapshot::default(), &mut seen);
     let ended = screen(&desktop);
     assert!(
-        ended.contains(ENDED.trim()),
+        ended.contains(panes::ENDED.trim()),
         "an exited process left its pane unflagged: {ended}"
     );
     assert!(
@@ -222,9 +221,9 @@ fn a_pane_that_never_ran_anything_is_not_flagged() {
     use swtos_frontend::resource::ResourceSnapshot;
     let mut desktop = Desktop::default();
     let mut seen = 0u32;
-    routing::follow(&mut desktop, &ResourceSnapshot::default(), &mut seen);
+    panes::follow(&mut desktop, &ResourceSnapshot::default(), &mut seen);
     assert!(
-        !screen(&desktop).contains(ENDED.trim()),
+        !screen(&desktop).contains(panes::ENDED.trim()),
         "an idle pane was flagged ended"
     );
 }

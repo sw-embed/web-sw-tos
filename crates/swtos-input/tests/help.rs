@@ -6,11 +6,11 @@
 //! overlay stuck with no documented way out.
 
 use swtos_input::dispatch;
-use swtos_session::build;
+use swtos_session::driver;
 use swtos_session::state::Session;
 
 fn open_help() -> Session {
-    let mut session = build::session();
+    let mut session = driver::session();
     dispatch::key(&mut session, "a", true);
     dispatch::key(&mut session, "?", false);
     assert!(

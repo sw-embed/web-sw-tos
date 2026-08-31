@@ -14,12 +14,12 @@ mod fake;
 
 use fake::FakeClock;
 use swtos_frontend::protocol::Mode;
+use swtos_session::driver;
 use swtos_session::state::Session;
-use swtos_session::{build, driver};
 
 fn framed() -> Session {
-    let mut session = build::session();
-    driver::run(&mut session, 600, f64::MAX, &FakeClock::stopped());
+    let mut session = driver::session();
+    driver::run(&mut session, 600, f64::MAX, &FakeClock::new(0.0));
     assert_eq!(
         session.transport.decoder.mode(),
         Mode::Framed,
@@ -47,9 +47,9 @@ fn screen(session: &Session) -> String {
 /// that a second offer was seen, which against a healthy target it never is.
 #[test]
 fn the_first_hello_goes_out_and_arms_a_retry() {
-    let mut session = build::session();
+    let mut session = driver::session();
     assert_eq!(session.transport.next_hello, 0, "nothing offered yet");
-    driver::run(&mut session, 1, f64::MAX, &FakeClock::stopped());
+    driver::run(&mut session, 1, f64::MAX, &FakeClock::new(0.0));
     assert!(
         session.transport.next_hello > 0,
         "no HELLO was offered on the first tick, so a target that missed \
@@ -68,7 +68,7 @@ fn hello_stops_once_the_transport_is_framed() {
     let deadline = session.transport.next_hello;
     let before = screen(&session).matches("MENU").count();
 
-    driver::run(&mut session, 400, f64::MAX, &FakeClock::stopped());
+    driver::run(&mut session, 400, f64::MAX, &FakeClock::new(0.0));
 
     assert_eq!(
         session.transport.next_hello, deadline,
@@ -88,7 +88,7 @@ fn hello_stops_once_the_transport_is_framed() {
 #[test]
 fn periodic_traffic_reaches_the_status_line_and_the_monitor() {
     let mut session = framed();
-    driver::run(&mut session, 600, f64::MAX, &FakeClock::stopped());
+    driver::run(&mut session, 600, f64::MAX, &FakeClock::new(0.0));
     let text = screen(&session);
 
     assert!(
@@ -104,7 +104,7 @@ fn periodic_traffic_reaches_the_status_line_and_the_monitor() {
 /// A deadline stops the run early, so the browser gets its thread back.
 #[test]
 fn the_deadline_bounds_the_work() {
-    let mut session = build::session();
-    let ran = driver::run(&mut session, 500, 50.0, &FakeClock::ticking(10.0));
+    let mut session = driver::session();
+    let ran = driver::run(&mut session, 500, 50.0, &FakeClock::new(10.0));
     assert!(ran < 500, "the deadline was ignored: {ran} ticks ran");
 }

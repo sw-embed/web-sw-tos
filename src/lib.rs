@@ -68,7 +68,7 @@ impl Component for App {
         browser::fetch_debug_map(ctx.link().clone());
         let resize = browser::on_resize(ctx.link().clone());
         Self {
-            session: swtos_session::build::session(),
+            session: swtos_session::driver::session(),
             geometry: 0,
             fit: (80, 24),
             fitted: false,

@@ -6,34 +6,23 @@ use swtos_session::state::{Clock, LocalTime};
 
 /// A clock the test drives.
 ///
-/// `elapsed` advances by a fixed step on every read, which is what lets a
-/// deadline be reached deterministically instead of by sleeping.
+/// `elapsed` advances by `step` on every read, which is what lets a deadline
+/// be reached deterministically instead of by sleeping. A step of zero never
+/// reaches one, for tests about behaviour rather than timing.
+///
+/// One constructor rather than several named ones: a test binary that used
+/// only some of them would trip dead-code, since this module is compiled into
+/// each binary separately.
 pub struct FakeClock {
     now: Cell<Millis>,
     step: Millis,
-    local: LocalTime,
 }
 
 impl FakeClock {
-    /// A clock that never reaches a deadline, for tests about behaviour rather
-    /// than timing.
-    pub fn stopped() -> Self {
+    pub fn new(step: Millis) -> Self {
         Self {
             now: Cell::new(0.0),
-            step: 0.0,
-            local: LocalTime {
-                hours: 13,
-                minutes: 45,
-                seconds: 7,
-            },
-        }
-    }
-
-    /// A clock that advances `step` milliseconds per reading.
-    pub fn ticking(step: Millis) -> Self {
-        Self {
             step,
-            ..Self::stopped()
         }
     }
 }
@@ -46,6 +35,10 @@ impl Clock for FakeClock {
     }
 
     fn local(&self) -> LocalTime {
-        self.local
+        LocalTime {
+            hours: 13,
+            minutes: 45,
+            seconds: 7,
+        }
     }
 }

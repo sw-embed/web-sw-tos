@@ -4,7 +4,7 @@
 //! bytes is indistinguishable from an emulator that is not running.
 
 use swtos_input::{dispatch, translate};
-use swtos_session::build;
+use swtos_session::driver;
 use swtos_session::state::Session;
 
 fn rendered(session: &Session) -> String {
@@ -51,7 +51,7 @@ fn printable_and_ctrl_letters_map_as_a_terminal_would() {
 /// Ctrl-A must never reach the target: it arms the frontend instead.
 #[test]
 fn the_prefix_is_consumed_and_the_next_key_is_a_command() {
-    let mut session = build::session();
+    let mut session = driver::session();
     assert!(
         dispatch::key(&mut session, "a", true).is_empty(),
         "prefix leaked to target"
@@ -68,7 +68,7 @@ fn the_prefix_is_consumed_and_the_next_key_is_a_command() {
 /// how Uptime and Clock are stopped.
 #[test]
 fn prefix_e_sends_escape_to_the_target() {
-    let mut session = build::session();
+    let mut session = driver::session();
     dispatch::key(&mut session, "a", true);
     assert_eq!(dispatch::key(&mut session, "e", false), vec![0x1b]);
 }
@@ -76,7 +76,7 @@ fn prefix_e_sends_escape_to_the_target() {
 /// Without the prefix, a bare key is ordinary input.
 #[test]
 fn an_unprefixed_key_reaches_the_target() {
-    let mut session = build::session();
+    let mut session = driver::session();
     assert_eq!(dispatch::key(&mut session, "3", false), b"3");
 }
 
@@ -84,7 +84,7 @@ fn an_unprefixed_key_reaches_the_target() {
 /// filtered, or a raw Escape renders as a replacement character in the pane.
 #[test]
 fn echo_shows_typing_but_not_control_bytes() {
-    let mut session = build::session();
+    let mut session = driver::session();
     for key in ["h", "i", "x", "Backspace", "Enter"] {
         dispatch::key(&mut session, key, false);
     }
@@ -104,7 +104,7 @@ fn echo_shows_typing_but_not_control_bytes() {
 /// Copy mode claims navigation keys so scrolling does not type into the shell.
 #[test]
 fn copy_mode_claims_navigation_and_releases_it_on_exit() {
-    let mut session = build::session();
+    let mut session = driver::session();
     dispatch::key(&mut session, "a", true);
     dispatch::key(&mut session, "y", false);
     assert!(
@@ -124,7 +124,7 @@ fn copy_mode_claims_navigation_and_releases_it_on_exit() {
 #[test]
 fn both_clear_bindings_are_consumed_by_the_frontend() {
     for key in ["l", "c"] {
-        let mut session = build::session();
+        let mut session = driver::session();
         dispatch::key(&mut session, "a", true);
         assert!(
             dispatch::key(&mut session, key, false).is_empty(),
@@ -142,7 +142,7 @@ fn both_clear_bindings_are_consumed_by_the_frontend() {
 #[test]
 fn a_shift_press_does_not_swallow_the_prefix() {
     for modifier in ["Shift", "Control", "Alt", "Meta", "CapsLock", "AltGraph"] {
-        let mut session = build::session();
+        let mut session = driver::session();
         dispatch::key(&mut session, "a", true);
         assert!(
             dispatch::key(&mut session, modifier, false).is_empty(),
@@ -161,14 +161,14 @@ fn a_shift_press_does_not_swallow_the_prefix() {
 /// A modifier on its own is not input either.
 #[test]
 fn a_modifier_alone_sends_nothing() {
-    let mut session = build::session();
+    let mut session = driver::session();
     assert!(dispatch::key(&mut session, "Shift", false).is_empty());
 }
 
 /// Keys typed at the Debugger pane must never reach the target.
 #[test]
 fn debugger_keys_do_not_go_out_as_tty_input() {
-    let mut session = build::session();
+    let mut session = driver::session();
     dispatch::key(&mut session, "a", true);
     dispatch::key(&mut session, "3", false); // focus pane 3 = Debugger
     for key in ["h", "e", "l", "p", "Enter"] {

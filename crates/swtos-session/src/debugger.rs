@@ -6,6 +6,7 @@
 //! nothing" looks like.
 
 use crate::state::Console;
+use swtos_frontend::debug::DebugConsole;
 use swtos_frontend::debug::{DebugMap, identity_request};
 use swtos_frontend::ui::Desktop;
 
@@ -87,4 +88,15 @@ fn enter(console: &mut Console, desktop: &mut Desktop) -> Option<Vec<u8>> {
         console.awaiting += 1;
     }
     result.request
+}
+
+/// A console with no debug map: at 1.6 MB it is fetched at runtime rather
+/// than compiled in, so symbolic commands report its absence until it lands.
+pub fn console() -> Console {
+    Console {
+        console: DebugConsole::new(None),
+        input: String::new(),
+        awaiting: 0,
+        pending: None,
+    }
 }
