@@ -3,9 +3,8 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/ui.rs
-//!   source commit: 1e75960 (taken from the committed tree, not a dirty
-//!                  working copy -- upstream had uncommitted edits here)
-//!   vendored:      2026-08-29
+//!   source commit: 4707342 (committed tree, not the dirty working copy)
+//!   vendored:      2026-08-30
 //!
 //! Adapted: adds `Cell`, `Color`, `Attrs`, a `render_grid` adapter over
 //! upstream's `render`, and `clear_focused`. See docs/architecture.md.
@@ -13,11 +12,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
-/// One character cell of the rendered screen.
-///
-/// Colour and attributes are carried from the start even though nothing sets
-/// them yet: returning `char` would force both this API and the browser
-/// renderer to be rewritten when colour arrives.
+/// One character cell of the rendered screen. Colour and attributes are
+/// carried from the start even though nothing sets them yet: returning `char`
+/// would force both this API and the browser renderer to be rewritten when
+/// colour arrives.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cell {
     pub ch: char,
@@ -46,8 +44,7 @@ impl Default for Cell {
     }
 }
 
-/// Terminal colour. `Indexed` is the 16-colour palette; bold maps to the
-/// bright half rather than to a font weight, so the grid stays monospaced.
+/// Terminal colour. `Indexed` is the 16-colour palette.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Color {
     #[default]
@@ -82,6 +79,13 @@ pub enum PaneKind {
 }
 
 impl PaneKind {
+    /// Panes the frontend creates for itself.
+    ///
+    /// Resources is the frontend's own monitor, always present because it
+    /// needs no slot and cannot be killed by accident. The `mon` program
+    /// reports the same figures as an ordinary process, so several can run at
+    /// once and any of them can be killed; this pane is the one that is
+    /// simply always there.
     pub const ALL: [Self; 4] = [
         Self::Shell,
         Self::Application,
@@ -94,8 +98,9 @@ impl PaneKind {
             Self::Shell => "Shell",
             Self::Application => "Application",
             Self::Debugger => "Debugger",
-            // Named for the mon program that reports the same figures.
-            Self::Resources => "mon",
+            // Not "mon": that is the program, which holds a slot and can be
+            // killed. Two things with one name on screen is one too many.
+            Self::Resources => "Resources",
         }
     }
 
@@ -344,10 +349,35 @@ impl Desktop {
         }
     }
 
+    /// Name a pane after the process occupying its channel.
+    ///
+    /// A pane is opened before anything is known about what will speak on it,
+    /// so it starts as "Application" or "TTY n". The resource snapshot names
+    /// the process behind every endpoint, which is the only way a pane opened
+    /// by a boot-time spawn ever learns what it is showing.
+    pub fn name_channel(&mut self, channel: u8, title: &str) {
+        if title.is_empty() {
+            return;
+        }
+        for pane in &mut self.panes {
+            if pane.channel == channel
+                && pane.kind == PaneKind::Application
+                && pane.title != title
+            {
+                pane.title = title.to_string();
+            }
+        }
+    }
+
+    /// Open (or rename) the pane for a channel, without taking focus.
+    ///
+    /// A new pane used to grab focus, which made launching two programs in a
+    /// row impossible: the second command was typed into the first program's
+    /// pane. Background means the prompt keeps the keyboard, so the pane
+    /// appears and the user decides when to look at it.
     pub fn add_application(&mut self, channel: u8, title: impl Into<String>) -> usize {
         if let Some(index) = self.panes.iter().position(|pane| pane.channel == channel) {
             self.panes[index].title = title.into();
-            self.focus = index;
             return index;
         }
         self.panes.push(Pane::new(
@@ -356,8 +386,7 @@ impl Desktop {
             title,
             DEFAULT_SCROLLBACK,
         ));
-        self.focus = self.panes.len() - 1;
-        self.focus
+        self.panes.len() - 1
     }
 
     /// Put back any system pane that has been closed.
@@ -386,11 +415,8 @@ impl Desktop {
         restored
     }
 
-    /// Empty the focused pane: scrollback, partial line, and scroll offset.
-    ///
-    /// LOCAL ADDITION, not upstream. `te-rs` has no clear command at all.
-    /// Additive rather than a change to existing logic, which is what keeps it
-    /// cheap to re-apply across re-vendoring.
+    /// Empty the focused pane. LOCAL ADDITION: upstream has no clear command,
+    /// though docs/use-cases.md documents `Ctrl-A l` for it.
     pub fn clear_focused(&mut self) {
         self.panes[self.focus].replace(&[]);
         self.panes[self.focus].scroll_offset = 0;
@@ -507,11 +533,9 @@ impl Desktop {
 
     /// The screen as a grid of exactly `height` rows of `width` cells.
     ///
-    /// Adapts upstream's `render`, which returns a `String` carrying
-    /// `\x1b[H`, a per-line `\x1b[K`, and `\r\n` to drive a real terminal.
-    /// Stripping those three back out is deliberately preferred over
-    /// converting every canvas write to cells: an adapter survives upstream
-    /// churn that an invasive conversion would not.
+    /// Adapts upstream's `render`, stripping the three escapes it emits to
+    /// drive a real terminal. An adapter survives upstream churn that an
+    /// invasive per-cell conversion would not.
     pub fn render_grid(&self, width: usize, height: usize) -> Vec<Vec<Cell>> {
         let text = self.render(width, height).replace("\x1b[H", "");
         let mut rows: Vec<Vec<Cell>> = text
@@ -696,13 +720,20 @@ impl Desktop {
 
     fn label_for(&self, index: usize) -> String {
         let pane = &self.panes[index];
-        // The pane number leads, so it is the part that survives truncation in
-        // a narrow column: it is what Ctrl-A <n> takes, and the name after it
-        // is the reminder. The marker points down at the pane being named.
+        // Two numbers matter and they are not the same: Ctrl-A takes the pane
+        // number, while the debugger, mon and ps all take the endpoint. Naming
+        // only the first invites killing endpoint 12 while watching pane 12,
+        // which shows a different process. The pane number leads because it
+        // survives truncation in a narrow column; the endpoint follows for
+        // panes that have one.
         format!(
-            "{} v {}{}{}",
+            "{} v {}{}{}{}",
             index + 1,
             pane.title,
+            match pane.kind {
+                PaneKind::Application => format!(" ep={}", u16::from(pane.channel) + 1),
+                _ => String::new(),
+            },
             if pane.alert { " !" } else { "" },
             if index == self.focus { " *" } else { "" }
         )
@@ -896,6 +927,17 @@ mod tests {
     }
 
     #[test]
+    fn form_feed_clears_a_pane_for_redraw() {
+        let mut desktop = Desktop::new(10);
+        desktop.push_channel(0, b"first report\nsecond line\n");
+        assert!(desktop.render(80, 24).contains("first report"));
+        desktop.push_channel(0, b"\x0csecond report\n");
+        let screen = desktop.render(80, 24);
+        assert!(!screen.contains("first report"), "{screen}");
+        assert!(screen.contains("second report"), "{screen}");
+    }
+
+    #[test]
     fn a_pane_bounds_a_line_that_never_ends() {
         // A clock printing forever is bounded by the scrollback limit, but a
         // program that emits no newline at all is only bounded by the line cap.
@@ -942,10 +984,10 @@ mod tests {
         assert!(top_left.contains("1 v Shell"), "{top_left}");
         assert!(top_right.contains("2 v Application"), "{top_right}");
         assert!(low_left.contains("3 v Debugger"), "{low_left}");
-        assert!(low_right.contains("4 v mon"), "{low_right}");
+        assert!(low_right.contains("4 v Resources"), "{low_right}");
 
         // No name appears twice anywhere on the screen's rules.
-        for name in ["Shell", "Application", "Debugger", "mon"] {
+        for name in ["Shell", "Application", "Debugger", "Resources"] {
             let seen: usize = rules.iter().map(|rule| rule.matches(name).count()).sum();
             assert_eq!(seen, 1, "{name} named {seen} times");
         }
@@ -964,7 +1006,7 @@ mod tests {
             .lines()
             .filter(|line| line.starts_with('-'))
             .collect();
-        assert!(rules[1].contains("4 v mon *"), "{}", rules[1]);
+        assert!(rules[1].contains("4 v Resources *"), "{}", rules[1]);
         assert!(!rules[0].contains("1 v Shell *"), "{}", rules[0]);
     }
 
@@ -980,7 +1022,7 @@ mod tests {
         assert!(large.contains("application"));
         let small = desktop.render(40, 12);
         assert!(small.contains("Shell *"));
-        assert!(small.contains("mon"));
+        assert!(small.contains("Resources"));
     }
 
     #[test]
@@ -1016,7 +1058,7 @@ mod tests {
         assert_eq!(desktop.pane_count(), 5);
         desktop.command(b'1');
         desktop.push_channel(7, b"count 1\ncount 2\n");
-        assert!(desktop.render(80, 24).contains("Counter !"));
+        assert!(desktop.render(80, 24).contains("Counter ep=8 !"));
         desktop.command(b'5');
         assert!(desktop.search("count 1"));
         assert!(!desktop.broadcast_enabled());

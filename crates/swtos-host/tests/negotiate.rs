@@ -49,16 +49,18 @@ fn the_target_acknowledges_hello_and_the_transport_goes_framed() {
     );
 }
 
-/// The command shell documented in `windows-usage.md` is reachable, and each
-/// command is terminated by LF.
+/// The command shell is reachable, and both line terminators work.
 ///
-/// This pins a bug that cost real debugging time: the shell parses every
-/// command byte by byte and terminates on 10. Sending 13 parses the command
-/// correctly and then answers `BAD`, so `help` and `ps -l` looked unsupported
-/// when they were merely mis-terminated. A CR regression would be invisible
-/// without this test -- the target still replies, just with a refusal.
+/// History worth keeping: the shell once terminated only on LF, and sending
+/// CR parsed the command correctly and then answered `BAD` -- so `help` and
+/// `ps -l` looked unsupported when they were merely mis-terminated. That cost
+/// real debugging time. Upstream's shell-parsing rework now accepts CR too,
+/// which this test surfaced by failing rather than by anyone noticing.
+///
+/// Enter still sends LF from this frontend: it works against both the old and
+/// the new target, so there is no reason to change it.
 #[test]
-fn framed_mode_reaches_the_command_shell_and_commands_end_with_lf() {
+fn framed_mode_reaches_the_command_shell_on_either_terminator() {
     assert!(
         shell_reply(b"help\n").contains("ps"),
         "help did not list ps"
@@ -68,8 +70,8 @@ fn framed_mode_reaches_the_command_shell_and_commands_end_with_lf() {
         "ps -l did not report the process table"
     );
     assert!(
-        shell_reply(b"help\r").contains("BAD"),
-        "CR was accepted; the LF requirement this test pins has changed"
+        !shell_reply(b"help\r").contains("BAD"),
+        "CR was refused; it has been accepted since sw-tos 525fbe2"
     );
 }
 

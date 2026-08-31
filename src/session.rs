@@ -21,7 +21,7 @@
 
 use crate::debugger::Console;
 use crate::keys;
-use crate::transport;
+use crate::transport::{self, SHELL};
 use swtos_frontend::protocol::{ConnectionDecoder, Mode, hello};
 use swtos_frontend::resource::SnapshotAssembler;
 use swtos_frontend::ui::{Cell, Desktop};
@@ -154,6 +154,12 @@ impl Session {
             .console
             .consume(kind, &mut self.desktop, &mut self.uart, key)
         {
+            // `!command` in the debugger is handed to the shell, which owns
+            // channel 0 regardless of which pane has focus.
+            if let Some(command) = self.console.shell_passthrough() {
+                let line = format!("{command}\n");
+                transport::transmit(&mut self.uart, &self.decoder, SHELL, line.as_bytes());
+            }
             return Vec::new();
         }
         let bytes = keys::to_bytes(key, ctrl);
@@ -167,9 +173,10 @@ impl Session {
     /// Run one frontend command. Prefix-`e` is the exception that reaches the
     /// target: it is how a running application is sent a real Escape.
     fn prefix_command(&mut self, key: &str) -> Vec<u8> {
-        // `c` is ours: upstream has no clear command, and intercepting it here
-        // keeps the vendored command table untouched.
-        if key == "c" {
+        // Clear is ours: upstream's command table has none, though
+        // docs/use-cases.md documents `Ctrl-A l` for it. `c` is kept as an
+        // alias because it shipped here first.
+        if key == "l" || key == "c" {
             self.desktop.clear_focused();
             return Vec::new();
         }

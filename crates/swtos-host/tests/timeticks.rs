@@ -74,21 +74,28 @@ fn mon_reports_when_the_uptime_tick_arrives() {
     );
 }
 
-/// Uptime counts up. Without the tick it reads a value that never arrives.
+/// The uptime tick is what drives a refresh, so a monitor must report
+/// repeatedly when ticked and only once when not.
+///
+/// This replaces an earlier test that typed `3` and parsed MM:SS out of the
+/// Uptime app. Upstream now autostarts `mon` when a frontend attaches, so the
+/// session no longer begins at a bare menu and that test was asserting a
+/// shape that had stopped existing. Counting refreshes tests the tick itself
+/// rather than one app's output format.
 #[test]
-fn uptime_counts_monotonically_when_ticked() {
-    let text: String = session(b"3", true).into_iter().map(|(_, t)| t).collect();
-    let stamps: Vec<u32> = text
-        .lines()
-        .filter_map(|line| {
-            let line = line.trim();
-            let (m, s) = line.split_once(':')?;
-            Some(m.parse::<u32>().ok()? * 60 + s.parse::<u32>().ok()?)
-        })
-        .collect();
-    assert!(stamps.len() >= 3, "too few timestamps to judge: {text:?}");
+fn the_uptime_tick_is_what_makes_a_monitor_refresh() {
+    fn reports(time_ticks: bool) -> usize {
+        session(b"run mon\n", time_ticks)
+            .into_iter()
+            .map(|(_, text)| text.matches('\u{c}').count())
+            .sum()
+    }
+    let ticked = reports(true);
+    let silent = reports(false);
+    println!("reports with ticks: {ticked}, without: {silent}");
     assert!(
-        stamps.windows(2).all(|w| w[1] >= w[0]),
-        "uptime went backwards: {stamps:?}"
+        ticked > silent,
+        "the uptime tick made no difference to refresh count: {ticked} vs {silent}"
     );
+    assert!(ticked >= 3, "a ticked monitor barely refreshed: {ticked}");
 }

@@ -108,3 +108,17 @@ fn copy_mode_claims_navigation_and_releases_it_on_exit() {
     session.send_key("q", false);
     assert_eq!(session.send_key("k", false), b"k", "copy mode never exited");
 }
+
+/// docs/use-cases.md binds clear to `Ctrl-A l`; `c` shipped here first and is
+/// kept as an alias.
+#[test]
+fn both_clear_bindings_are_consumed_by_the_frontend() {
+    for key in ["l", "c"] {
+        let mut session = Session::default();
+        session.send_key("a", true);
+        assert!(
+            session.send_key(key, false).is_empty(),
+            "Ctrl-A {key} leaked to the target instead of clearing"
+        );
+    }
+}

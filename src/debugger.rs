@@ -16,6 +16,8 @@ pub const CHANNEL: u8 = 254;
 pub struct Console {
     console: DebugConsole,
     input: String,
+    /// A `!command` waiting to be handed to the shell.
+    pending: Option<String>,
     /// Requests sent with no reply yet. The target answers an endpoint that
     /// holds no process, or a runway process with no parked ISR frame, with
     /// silence -- indistinguishable from a broken debugger unless said.
@@ -30,6 +32,7 @@ impl Default for Console {
         Self {
             console: DebugConsole::new(None),
             input: String::new(),
+            pending: None,
             awaiting: 0,
         }
     }
@@ -43,12 +46,27 @@ impl Console {
         identity_request()
     }
 
+    /// A line the debugger should hand to the shell instead of running
+    /// itself, per `docs/use-cases.md`: `!ps -l`, `!bg mon`, `!kill 3`.
+    /// Returns the command without its `!`.
+    pub fn shell_passthrough(&mut self) -> Option<String> {
+        let line = self.pending.take()?;
+        Some(line)
+    }
+
     /// Handle one key typed at the Debugger pane. Returns a DEBUG_REQUEST
     /// payload when the command produced one.
     pub fn key(&mut self, desktop: &mut Desktop, key: &str) -> Option<Vec<u8>> {
         match key {
             "Enter" => {
                 desktop.push_channel(CHANNEL, b"\n");
+                if let Some(command) = self.input.strip_prefix('!') {
+                    let command = command.trim().to_string();
+                    desktop.push_channel(CHANNEL, format!("-> shell: {command}\n").as_bytes());
+                    self.pending = Some(command);
+                    self.input.clear();
+                    return None;
+                }
                 if self.awaiting > 0 {
                     desktop.push_channel(
                         CHANNEL,

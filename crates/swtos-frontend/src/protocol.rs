@@ -3,13 +3,10 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/protocol.rs
-//!   source commit: 9fed3b7
-//!   vendored:      2026-08-28
+//!   source commit: 4707342 (committed tree, not the dirty working copy)
+//!   vendored:      2026-08-30
 //!
-//! Copied unchanged apart from this header. `sw-tos` is read-only to this
-//! project, so fixes belong here and are carried across re-vendoring by hand.
-//! The module is dependency-free by design -- it is the one piece the byte
-//! path needs, which is why it is vendored ahead of the display modules.
+//! Vendored unmodified.
 
 pub const SYNC: [u8; 2] = [0xa5, 0x5a];
 pub const VERSION: u8 = 1;
