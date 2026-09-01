@@ -3,8 +3,8 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/debug.rs
-//!   source commit: e08fa4e (committed tree)
-//!   vendored:      2026-08-31
+//!   source commit: 60e6a57 (committed tree)
+//!   vendored:      2026-09-01
 //!
 //! Adapted: `DebugMap::load(path)` replaced by `from_json`. There is no
 //! filesystem here; the browser fetches the map as a static asset.

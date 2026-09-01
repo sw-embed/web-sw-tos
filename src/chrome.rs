@@ -62,8 +62,9 @@ pub fn fit() -> (usize, usize) {
 /// without already knowing them.
 pub fn diagnostics(status: &Status, ms: f64) -> Html {
     let text = if status.prefix_armed {
-        "PREFIX -- ? help   z zoom   1-9 focus   n next   y copy-mode   \
-         c clear   e send-Escape-to-app   x close"
+        "PREFIX -- ? help   1-9 focus   n next   z zoom   x close   \
+         l clear   c close-ended   k restart-shell   y copy-mode   \
+         e send-Escape-to-app"
             .to_string()
     } else {
         // The transport mode is the single most useful thing here: plain

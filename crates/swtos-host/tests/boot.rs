@@ -5,7 +5,8 @@
 //! native baseline the browser is measured against.
 
 use std::time::Instant;
-use swtos_host::pump::{Pump, heartbeat_frame};
+use swtos_host::control::heartbeat_frame;
+use swtos_host::pump::Pump;
 use swtos_host::uart::{HEARTBEAT_BYTE_CYCLES, VirtualUart};
 
 const BATCH: u64 = 50_000;

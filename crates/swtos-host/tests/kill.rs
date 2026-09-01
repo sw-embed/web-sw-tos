@@ -1,7 +1,8 @@
 //! Does `kill EP` actually terminate a process?
 use swtos_frontend::debug::DebugConsole;
 use swtos_frontend::protocol::{ConnectionDecoder, Frame, FrameType, Mode, StreamItem, hello};
-use swtos_host::pump::{Pump, heartbeat_frame};
+use swtos_host::control::heartbeat_frame;
+use swtos_host::pump::Pump;
 use swtos_host::uart::{FRAME_BYTE_CYCLES, HEARTBEAT_BYTE_CYCLES, VirtualUart};
 
 const BATCH: u64 = 50_000;

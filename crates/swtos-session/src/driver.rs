@@ -19,7 +19,7 @@ pub fn run(session: &mut Session, steps: u32, deadline: Millis, clock: &impl Clo
     while done < steps {
         sending::offer_hello(session);
         sending::periodic(session, clock);
-        let heartbeat = swtos_host::pump::heartbeat_frame(session.tick);
+        let heartbeat = swtos_host::control::heartbeat_frame(session.tick);
         session
             .transport
             .uart

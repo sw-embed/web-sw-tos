@@ -10,14 +10,6 @@ use crate::uart::VirtualUart;
 use cor24_emulator::EmulatorCore;
 use cor24_emulator::cpu::state::UartDirection;
 
-/// The scheduler heartbeat SWTOS needs for preemption, as the host sends it:
-/// a fixed five-byte frame carrying a 24-bit little-endian tick. Sent at
-/// 100 Hz. Without it SWTOS falls back to cooperative scheduling and a
-/// process that never yields can never be interrupted.
-pub fn heartbeat_frame(tick: u32) -> [u8; 5] {
-    [0xff, 1, tick as u8, (tick >> 8) as u8, (tick >> 16) as u8]
-}
-
 /// The emulator plus the bookkeeping needed to read its UART as bytes.
 pub struct Pump {
     emu: EmulatorCore,

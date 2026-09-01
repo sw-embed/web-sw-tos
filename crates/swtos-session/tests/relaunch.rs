@@ -59,26 +59,39 @@ fn the_menu_still_answers_after_a_program_ends() {
     );
 
     // End it: the app is waiting on a key.
+    //
+    // The most recently opened application pane, not the first. `mon` is an
+    // ordinary program now and owns an application pane of its own, so taking
+    // the first one sent the keystroke to the monitor -- which is blocked on a
+    // clock tick, swallowed it, and left hello waiting forever.
     let app = session
         .panes
         .desktop
         .layout()
         .into_iter()
-        .find(|(kind, channel, _)| {
+        .rfind(|(kind, channel, _)| {
             *channel != routing::SHELL && *kind == swtos_frontend::ui::PaneKind::Application
         })
         .map(|(_, channel, _)| channel);
     if let Some(channel) = app {
         swtos_session::sending::to_channel(&mut session, channel, b" ");
         settle(&mut session);
+        settle(&mut session);
     }
 
-    // Back at the Shell, the menu must answer again.
+    // Back at the Shell, the menu must answer again. The evidence is the
+    // second program's own output: "Counter" is no evidence at all, because
+    // the menu banner says "2=Counter" whether or not anything ran.
     let marker = screen(&session).matches("Choice").count();
     type_keys(&mut session, &["2", "\n"]);
+    settle(&mut session);
     let after = screen(&session);
     assert!(
-        after.matches("Choice").count() > marker || after.contains("Counter"),
+        after.matches("Choice").count() > marker,
         "the menu stopped answering after a program ended:\n{after}"
+    );
+    assert!(
+        after.contains("C1"),
+        "the second program never ran:\n{after}"
     );
 }

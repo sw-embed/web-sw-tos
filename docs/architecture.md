@@ -142,7 +142,7 @@ Every local change to a vendored file, so re-vendoring is mechanical rather
 than archaeological. Re-vendor by copying upstream fresh, then walking this
 table.
 
-Current vendoring: **sw-tos e08fa4e**.
+Current vendoring: **sw-tos 60e6a57**.
 
 | File | Kind | Change |
 |---|---|---|
@@ -169,6 +169,22 @@ filesystem, and no `Instant`. Every patch that existed because this project
 wanted different behaviour is gone.
 
 ### What this re-vendor taught
+
+Nothing was deleted this time and nothing was added to the table: `ui.rs` grew
+two-snapshot `(ended)` marking and a help line, and the adapter did not notice.
+The work was all on this side of the boundary, which is the table doing its
+job.
+
+`Ctrl-A k` is the interesting one. Upstream sends the restart request raw on a
+plain link and wrapped in a passthrough frame once the link is framed, because
+`cor24-debug-adapter` sits in between reading frames and discards whatever is
+not one. There is no adapter here -- the pump hands bytes straight to the
+modeled UART -- so the mode distinction collapses and the request is always
+raw. Porting the branch as written would have been faithful to the source and
+wrong for this target. `swtos-host/src/control.rs` says so where a reader will
+be standing when they wonder.
+
+### What the e08fa4e re-vendor taught
 
 The table lost a row for the second cycle running, and this time the deletions
 came from outside it as well. Upstream grew `ended` on a pane,
@@ -222,8 +238,8 @@ they are not patches. Opening a pane on `ChannelOpen` and following the
 resource snapshot live in `crates/swtos-session/`, this project's own frame
 routing, and cost nothing at re-vendor time. There is no longer any exception:
 with `clear_focused` gone, every vendored file is either unmodified or carries
-only a platform-forced patch, which is why all 28 vendored tests run
-unmodified.
+only a platform-forced patch, which is why all vendored tests run unmodified --
+including the two upstream added for short-lived processes.
 
 ## What is vendored, and from where
 

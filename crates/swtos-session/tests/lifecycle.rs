@@ -83,8 +83,18 @@ fn a_pane_says_when_its_process_has_ended() {
         output(3, "the answer is 42\n"),
     );
     panes::follow(&mut panes.desktop, &snapshot(&[(4, "hello")]));
-    panes::follow(&mut panes.desktop, &snapshot(&[]));
 
+    // One absent snapshot is not proof. Output can reach a pane before the
+    // snapshot that first lists its process as running, and a pane that
+    // flickered to (ended) while its program was starting up would be worse
+    // than one that takes a moment to notice.
+    panes::follow(&mut panes.desktop, &snapshot(&[]));
+    assert!(
+        !screen(&panes).contains("(ended)"),
+        "one missing snapshot was treated as proof the process had gone"
+    );
+
+    panes::follow(&mut panes.desktop, &snapshot(&[]));
     let text = screen(&panes);
     assert!(
         text.contains("(ended)"),

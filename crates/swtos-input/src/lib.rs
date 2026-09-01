@@ -6,4 +6,5 @@
 //! this crate onto `swtos-session`, never back.
 
 pub mod dispatch;
+pub mod restart;
 pub mod translate;

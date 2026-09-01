@@ -4,6 +4,7 @@
 //! the `sw-tos` repository: it owns the system image, the virtual UART that
 //! replaces the pty, and the pump that drives the emulator.
 
+pub mod control;
 pub mod image;
 pub mod pump;
 pub mod uart;

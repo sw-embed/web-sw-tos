@@ -4,7 +4,8 @@
 //! browser adds nothing but latency to diagnosing it.
 
 use swtos_frontend::protocol::{ConnectionDecoder, Mode, StreamItem, hello};
-use swtos_host::pump::{Pump, heartbeat_frame};
+use swtos_host::control::heartbeat_frame;
+use swtos_host::pump::Pump;
 use swtos_host::uart::{FRAME_BYTE_CYCLES, HEARTBEAT_BYTE_CYCLES, VirtualUart};
 
 const BATCH: u64 = 50_000;

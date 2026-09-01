@@ -13,29 +13,22 @@ deployed from a clean checkout.
 | Field | Value |
 |---|---|
 | Source repository | `sw-embed/sw-tos` |
-| Source commit | `e08fa4ed9edce356bdc7b6d20df18928f5bee34b` |
+| Source commit | `60e6a5748a348b42b2be39906cbfd2c84964e002` |
 | Source path | `build/scheduled-shell/` |
-| Vendored on | 2026-08-31 (re-vendored) |
+| Vendored on | 2026-09-01 (re-vendored) |
 | Build recipe | `just scheduled-shell-build` |
 
-`sw-tos` has since moved to `5839aad`, which is **not** vendored here. Those
-two commits change only the image source -- `ps` reports `WAITING` rather than
-`BLOCKED`, and `ps -l` became the same report `mon` prints, from the same code
--- and no built artifacts exist for them: `build/scheduled-shell/` still holds
-`crc24:500933`, and the working tree is mid-edit. Building there to get ahead
-would mean writing into a repository this project treats as read-only, and
-would produce an image matching no commit at all. The vendored pair is
-therefore the newest one that is both built and identifiable.
-
-Nothing here reads those state names, so the gap costs only the two new
-behaviours, not correctness.
+The `sw-tos` working tree was clean at this commit and the built artifacts
+postdate every image source it contains, so the pair below corresponds to
+`60e6a57` and not to work in progress. The previous vendoring deliberately
+stopped two commits short for exactly that reason; this one does not have to.
 
 ## Artifacts
 
 | File | Size | Role |
 |---|---|---|
-| `program.bin` | 26,948 bytes | The preemptive-multitasking image, loaded at address 0 |
-| `program.debug.json` | 1,824,948 bytes | Symbol, function, and instruction map for the debugger pane |
+| `program.bin` | 27,883 bytes | The preemptive-multitasking image, loaded at address 0 |
+| `program.debug.json` | 1,894,590 bytes | Symbol, function, and instruction map for the debugger pane |
 
 ## Identity
 
@@ -45,10 +38,10 @@ be replaced together.
 | Field | Value |
 |---|---|
 | `format` | `swtos-debug-v1` |
-| `build_id` | `crc24:500933` |
-| `build_id_size` | 8997 |
-| `image_size` | 26948 |
-| `image_sha256` | `e09f316a5a93fd4c6474aee2d8e6772488ba215610abb254921cff0f14f38592` |
+| `build_id` | `crc24:472414` |
+| `build_id_size` | 9356 |
+| `image_size` | 27883 |
+| `image_sha256` | `104cc79add85df211daafb319402e40dab6121626511c1e4532c9c79556046d2` |
 
 `build_id` is the identity the SWTOS debugger's identity opcode returns, as a
 CRC over the image's immutable range. `crates/swtos-host/src/image.rs` mirrors

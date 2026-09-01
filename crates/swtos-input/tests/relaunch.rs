@@ -1,9 +1,15 @@
 //! Can the shell launch, and then launch again?
 //!
 //! The reported symptom was that after running one program the menu stopped
-//! answering. sw-tos 43734d5 identified the cause on its side: the shell's
-//! join waited for every child rather than the one it started, and the
-//! monitor is a child that never exits.
+//! answering. Two sw-tos fixes were needed. 43734d5 stopped the shell joining
+//! on every child rather than the one it started -- the monitor is a child and
+//! never exits -- and 5ce74ac stopped the exiting program handing the keyboard
+//! to whichever of the first two slots was occupied, which by then was the
+//! monitor, blocked on a clock tick rather than waiting for a person.
+//!
+//! The numbered menu is deliberately synchronous: one program at a time. So
+//! the sequence a person performs is launch, end it from its own pane, return
+//! to the Shell, launch again -- and all four steps are checked here.
 
 use swtos_frontend::protocol::Mode;
 use swtos_frontend::resource::Millis;
@@ -25,20 +31,16 @@ fn settle(session: &mut Session) {
     driver::run(session, 700, f64::MAX, &Stopped);
 }
 
-/// Endpoints the target reports as running, by name.
-fn running(session: &Session) -> Vec<String> {
+/// The whole screen as text, which is the evidence a person actually has.
+fn screen(session: &Session) -> String {
     session
         .panes
-        .resources
-        .snapshot()
-        .map(|snap| {
-            snap.processes
-                .values()
-                .filter(|process| process.state != 0)
-                .map(|process| process.name.clone())
-                .collect()
-        })
-        .unwrap_or_default()
+        .desktop
+        .render_grid(160, 44)
+        .into_iter()
+        .map(|row| row.into_iter().map(|cell| cell.ch).collect::<String>())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn type_line(session: &mut Session, text: &str) {
@@ -49,6 +51,12 @@ fn type_line(session: &mut Session, text: &str) {
     settle(session);
 }
 
+/// Focus a pane by its Ctrl-A number.
+fn focus(session: &mut Session, number: &str) {
+    dispatch::key(session, "a", true);
+    dispatch::key(session, number, false);
+}
+
 #[test]
 fn the_shell_launches_a_second_program_after_the_first() {
     let mut session = driver::session();
@@ -56,68 +64,76 @@ fn the_shell_launches_a_second_program_after_the_first() {
     settle(&mut session);
     assert_eq!(session.transport.decoder.mode(), Mode::Framed);
 
+    // 1 = Hello. It prints and then waits for a key.
     type_line(&mut session, "1");
     settle(&mut session);
-    let after_first = running(&session);
+    let launched = screen(&session);
+    assert!(
+        launched.contains("Press key"),
+        "menu choice 1 launched nothing: {launched}"
+    );
 
-    // Dismiss the launched program from its own pane, as a person would.
-    dispatch::key(&mut session, "a", true);
-    dispatch::key(&mut session, "4", false);
-    let target = session.panes.desktop.focused_channel();
-    let ttyin = |s: &Session, ep: u8| -> u32 {
-        s.panes
-            .resources
-            .snapshot()
-            .and_then(|snap| snap.processes.get(&ep))
-            .map(|p| p.tty_in)
-            .unwrap_or(0)
-    };
-    let before = ttyin(&session, target + 1);
+    // End it from its own pane, as a person would.
+    focus(&mut session, "4");
     dispatch::key(&mut session, " ", false);
     settle(&mut session);
-    println!(
-        "focused channel {target} (endpoint {}), its tty_in {before} -> {}",
-        target + 1,
-        ttyin(&session, target + 1)
+    settle(&mut session);
+    let dismissed = screen(&session);
+    assert!(
+        dismissed.contains("READY"),
+        "the program never released the prompt: {dismissed}"
+    );
+    assert!(
+        dismissed.contains("(ended)"),
+        "the pane never admitted its process had gone: {dismissed}"
     );
 
-    // Back to the Shell before typing again: input goes to the focused
-    // channel, and the pane just dismissed is not the Shell.
-    dispatch::key(&mut session, "a", true);
-    dispatch::key(&mut session, "1", false);
+    // Back to the Shell and choose again. 2 = Counter, which prints C1..C5:
+    // output no menu text contains, so it cannot be confused with the banner.
+    focus(&mut session, "1");
     type_line(&mut session, "2");
     settle(&mut session);
-    let after_second = running(&session);
-
-    println!("running after first launch:  {after_first:?}");
-    println!("running after second launch: {after_second:?}");
-    println!("panes: {:?}", session.panes.desktop.layout());
-
+    settle(&mut session);
+    let after = screen(&session);
     assert!(
-        after_first
-            .iter()
-            .any(|name| name != "shell" && name != "mon"),
-        "the first launch started nothing: {after_first:?}"
+        after.contains("C1"),
+        "the second launch produced nothing: {after}"
     );
-    // The launched program did exit when its pane was given a key: proof the
-    // frontend delivers to an application channel, and that dismissal works.
-    assert!(
-        !after_second.iter().any(|name| name == "hello"),
-        "the program did not exit when its pane was given a key, which would \
-         be a delivery failure on this side: {after_second:?}"
-    );
+}
 
-    // KNOWN ISSUE, target side, narrower than it was. sw-tos 43734d5 fixed
-    // the shell joining on every child rather than the one it started, and
-    // the first launch now works where it previously took the prompt for
-    // good. A second launch after the first ends still does not happen.
-    //
-    // Asserted as it stands so this test fails when sw-tos fixes it; invert
-    // it to `any(|name| name == "counter")` at that point. Asserting the
-    // wanted behaviour now would only be a red test with nothing to act on.
+/// KNOWN ISSUE, and not one this side can fix alone.
+///
+/// A program that starts and finishes between two resource snapshots is never
+/// seen running by either of them, so nothing renames its pane. Its output
+/// therefore lands in a pane still carrying the previous program's name and
+/// still marked `(ended)`. Upstream already accepted this argument once --
+/// `push_channel` sets `ran` because output is better evidence than a snapshot
+/// -- but it does not yet clear `ended` on the same reasoning, and `ended` is
+/// private to the vendored file.
+///
+/// Asserted as it stands so this fails when upstream applies that reasoning.
+#[test]
+fn a_reused_pane_still_wears_the_previous_program_name() {
+    let mut session = driver::session();
+    settle(&mut session);
+    settle(&mut session);
+
+    type_line(&mut session, "1");
+    settle(&mut session);
+    focus(&mut session, "4");
+    dispatch::key(&mut session, " ", false);
+    settle(&mut session);
+    settle(&mut session);
+    focus(&mut session, "1");
+    type_line(&mut session, "2");
+    settle(&mut session);
+    settle(&mut session);
+
+    let after = screen(&session);
+    assert!(after.contains("C1"), "counter never ran: {after}");
     assert!(
-        !after_second.iter().any(|name| name == "counter"),
-        "a second launch now works -- invert this assertion and re-check the \
-         menu end to end: {after_first:?} then {after_second:?}"
+        after.contains("hello ep=3 (ended)"),
+        "the reused pane is named correctly now -- delete this test and assert \
+         the pane says `counter` instead: {after}"
     );
 }

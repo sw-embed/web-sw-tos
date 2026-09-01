@@ -145,12 +145,17 @@ stale, it is the result, and it should persist until dismissed.
 
 **Reuse clears; an explicit clear exists.** When a channel is reused for a new
 application the pane is cleared first, so one program's output can never be
-mistaken for the next one's. Separately, `Ctrl-A c` clears the focused pane on
-demand -- scrollback, the partial line, and the scroll offset.
+mistaken for the next one's. Separately, a pane can be cleared on demand --
+scrollback, the partial line, and the scroll offset.
 
-Both belong to the application-panes step. Recording them here because the
-choice is not obvious from the reference implementation, and a later reader
-comparing the two frontends should find the reason rather than assume drift.
+Both were local additions when this was written and both are upstream now, so
+the bindings are upstream's: `Ctrl-A l` clears the focused pane and `Ctrl-A c`
+closes the ended ones. The local versions were deleted rather than kept
+alongside; keeping them would have shadowed `Ctrl-A c`, whose meaning changed.
+
+Recording this here because the choice is not obvious from the reference
+implementation, and a later reader comparing the two frontends should find the
+reason rather than assume drift.
 
 ## Known hazards
 

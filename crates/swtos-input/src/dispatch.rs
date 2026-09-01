@@ -5,6 +5,7 @@
 //! that prefix. Copy mode claims navigation. Only what none of them wants
 //! reaches SWTOS.
 
+use crate::restart;
 use crate::translate;
 use swtos_frontend::ui::PaneKind;
 use swtos_session::routing::SHELL;
@@ -62,13 +63,19 @@ fn prefix(session: &mut Session, key: &str, ctrl: bool) -> Option<Vec<u8>> {
     None
 }
 
-/// Run one frontend command. Prefix-`e` is the exception that reaches the
-/// target: it is how a running application is sent a real Escape.
+/// Run one frontend command. Two reach the target rather than the desktop:
+/// `e` sends a running application a real Escape, and `k` asks for the shell
+/// to be restarted -- the only way out of a command that will not give the
+/// CPU back.
 fn command(session: &mut Session, key: &str) -> Vec<u8> {
     if key == "e" {
         let channel = session.panes.desktop.focused_channel();
         sending::to_channel(session, channel, &[0x1b]);
         return vec![0x1b];
+    }
+    if key == "k" {
+        restart::send(session);
+        return Vec::new();
     }
     session.panes.desktop.command(translate::command_byte(key));
     Vec::new()
@@ -86,7 +93,14 @@ fn console_pane(session: &mut Session, key: &str) -> bool {
                 sending::debug_request(session, request);
             }
             if let Some(line) = session.console.pending.take() {
-                sending::to_channel(session, SHELL, format!("{line}\n").as_bytes());
+                // `!kill 1` is the shell. Asking the shell to kill itself by
+                // typing at it needs the shell to be reading, which is the
+                // thing in doubt whenever this is asked for.
+                if restart::is_request(&line) {
+                    restart::send(session);
+                } else {
+                    sending::to_channel(session, SHELL, format!("{line}\n").as_bytes());
+                }
             }
             true
         }

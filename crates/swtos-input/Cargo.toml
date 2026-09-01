@@ -8,4 +8,5 @@ description = "Browser key events to SWTOS terminal bytes and frontend commands"
 
 [dependencies]
 swtos-frontend = { path = "../swtos-frontend" }
+swtos-host = { path = "../swtos-host" }
 swtos-session = { path = "../swtos-session" }
