@@ -3,7 +3,7 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/ui.rs
-//!   source commit: 60e6a57 (committed tree)
+//!   source commit: 5a25f22 (committed tree)
 //!   vendored:      2026-09-01
 //!
 //! Adapted: adds `Cell`, `Color`, `Attrs`, and a `render_grid` adapter
@@ -645,6 +645,7 @@ impl Desktop {
                         "w save  R restore-layout",
                         "copy: arrows/hjkl  PgUp/PgDn  g/G  q exit",
                         "r reconnect/redraw  e target-Escape  k restart shell",
+                        "B warm SWTOS reboot (ISR request)",
                         "? help  d detach",
                         "close help: q, Escape, or ?",
                     ],

@@ -142,7 +142,7 @@ Every local change to a vendored file, so re-vendoring is mechanical rather
 than archaeological. Re-vendor by copying upstream fresh, then walking this
 table.
 
-Current vendoring: **sw-tos 60e6a57**.
+Current vendoring: **sw-tos 5a25f22**.
 
 | File | Kind | Change |
 |---|---|---|
@@ -169,6 +169,27 @@ filesystem, and no `Instant`. Every patch that existed because this project
 wanted different behaviour is gone.
 
 ### What this re-vendor taught
+
+Upstream ran rustfmt over the frontend this cycle, so all four vendored files
+came back reformatted. That is churn the patch inventory absorbs without
+comment, because the patches are described by what they do rather than by line
+numbers, and re-vendoring copies fresh and reapplies them. The real content in
+that diff was two lines: a help entry, and `iv`/`ir` for the interrupt
+registers in the disassembler, where the shared ISA crate exposes `r6`/`r7`
+but COR24 assembly accepts only the architectural aliases.
+
+`Ctrl-A B` joins `Ctrl-A k` as an unframed escape, and the pairing is why
+`control.rs` exists: a restart rewinds endpoint 1 and keeps everything, a
+reboot tears the system down and builds it again. Both are two bytes read by
+the interrupt handler.
+
+The footer clock was the quiet find. It was only ever updated on the framed
+path, so it stopped whenever the target did -- which is precisely when a clock
+is worth reading. That was reported once as "the footer clock is not
+incrementing" and diagnosed then as a target fault, which it also was; this
+half of it survived. It now updates before the framed guard.
+
+### What the 60e6a57 re-vendor taught
 
 Nothing was deleted this time and nothing was added to the table: `ui.rs` grew
 two-snapshot `(ended)` marking and a help line, and the adapter did not notice.

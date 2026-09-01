@@ -8,8 +8,8 @@
     
     
 <script type="module">
-import init, * as bindings from '/web-sw-tos/web-sw-tos-85c702b34271ae98.js';
-const wasm = await init({ module_or_path: '/web-sw-tos/web-sw-tos-85c702b34271ae98_bg.wasm' });
+import init, * as bindings from '/web-sw-tos/web-sw-tos-183d83090aba10db.js';
+const wasm = await init({ module_or_path: '/web-sw-tos/web-sw-tos-183d83090aba10db_bg.wasm' });
 
 
 window.wasmBindings = bindings;
@@ -60,7 +60,7 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
         }
         #app { flex: 1; display: flex; flex-direction: column; min-height: 0; }
     </style>
-<link rel="modulepreload" href="/web-sw-tos/web-sw-tos-85c702b34271ae98.js" crossorigin="anonymous" integrity="sha384-UnBR0g7OMvQn5p87YA4+MZ+7z3GVNlPcTmp3LKb6bWgR9QI6bsLCvYqUhdJtpqCb"><link rel="preload" href="/web-sw-tos/web-sw-tos-85c702b34271ae98_bg.wasm" crossorigin="anonymous" integrity="sha384-6NVhqP1F/ciYjUiPFwaRpmb/P7+1YsdEfkhR70m9h1ZuShx+Yv1D/HLtGjczW53S" as="fetch" type="application/wasm"></head>
+<link rel="modulepreload" href="/web-sw-tos/web-sw-tos-183d83090aba10db.js" crossorigin="anonymous" integrity="sha384-UnBR0g7OMvQn5p87YA4+MZ+7z3GVNlPcTmp3LKb6bWgR9QI6bsLCvYqUhdJtpqCb"><link rel="preload" href="/web-sw-tos/web-sw-tos-183d83090aba10db_bg.wasm" crossorigin="anonymous" integrity="sha384-CkoMF3LPNQ3DwlZ1xev5BWNha8YWMkBRf1FyhydBGl3ZGQQ9WQgcX/4jLutbNvJF" as="fetch" type="application/wasm"></head>
 <body>
     <div id="app"></div>
 </body>

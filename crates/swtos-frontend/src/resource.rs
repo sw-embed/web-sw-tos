@@ -3,7 +3,7 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/resource.rs
-//!   source commit: 60e6a57 (committed tree)
+//!   source commit: 5a25f22 (committed tree)
 //!   vendored:      2026-09-01
 //!
 //! Adapted: `Instant` replaced by `Millis` (an `f64`) supplied by the
@@ -12,7 +12,7 @@
 use std::collections::BTreeMap;
 /// A monotonic timestamp in milliseconds, supplied by the caller.
 ///
-/// Upstream uses `std::time::Instant`, whose `now()` panics on
+/// Upstream uses a `std` monotonic clock, whose `now()` panics on
 /// wasm32-unknown-unknown, and a caller-supplied clock is more testable.
 pub type Millis = f64;
 

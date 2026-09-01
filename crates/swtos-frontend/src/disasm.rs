@@ -3,10 +3,11 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/disasm.rs
-//!   source commit: 60e6a57 (committed tree)
+//!   source commit: 5a25f22 (committed tree)
 //!   vendored:      2026-09-01
 //!
 //! Vendored unmodified.
+//!
 //!
 //! The debugger's `dis` reads its answers from the build's debug map, which
 //! covers only the statically linked image. A spawned process runs a private
@@ -49,9 +50,15 @@ fn table() -> [Option<(Opcode, u8, u8)>; 256] {
     table
 }
 
-/// The ISA crate's own names, so the two cannot drift apart.
+/// Use the assembler-visible architectural aliases for the two interrupt
+/// registers.  The shared ISA crate deliberately exposes their raw register
+/// file names (`r6`/`r7`) while COR24 assembly accepts only `iv`/`ir`.
 fn register(index: u8) -> &'static str {
-    cor24_isa::register::reg_name(index)
+    match index & 7 {
+        6 => "iv",
+        7 => "ir",
+        other => cor24_isa::register::reg_name(other),
+    }
 }
 
 /// Decode one instruction from `bytes`, which begins at the instruction.

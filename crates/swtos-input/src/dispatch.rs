@@ -5,7 +5,7 @@
 //! that prefix. Copy mode claims navigation. Only what none of them wants
 //! reaches SWTOS.
 
-use crate::restart;
+use crate::recovery;
 use crate::translate;
 use swtos_frontend::ui::PaneKind;
 use swtos_session::routing::SHELL;
@@ -63,10 +63,10 @@ fn prefix(session: &mut Session, key: &str, ctrl: bool) -> Option<Vec<u8>> {
     None
 }
 
-/// Run one frontend command. Two reach the target rather than the desktop:
-/// `e` sends a running application a real Escape, and `k` asks for the shell
-/// to be restarted -- the only way out of a command that will not give the
-/// CPU back.
+/// Run one frontend command. Three reach the target rather than the desktop:
+/// `e` sends a running application a real Escape, `k` asks for the shell to be
+/// restarted -- the only way out of a command that will not give the CPU back
+/// -- and `B` asks for a warm reboot when a restart is not enough.
 fn command(session: &mut Session, key: &str) -> Vec<u8> {
     if key == "e" {
         let channel = session.panes.desktop.focused_channel();
@@ -74,7 +74,11 @@ fn command(session: &mut Session, key: &str) -> Vec<u8> {
         return vec![0x1b];
     }
     if key == "k" {
-        restart::send(session);
+        recovery::restart_shell(session);
+        return Vec::new();
+    }
+    if key == "B" {
+        recovery::reboot_system(session);
         return Vec::new();
     }
     session.panes.desktop.command(translate::command_byte(key));
@@ -96,8 +100,8 @@ fn console_pane(session: &mut Session, key: &str) -> bool {
                 // `!kill 1` is the shell. Asking the shell to kill itself by
                 // typing at it needs the shell to be reading, which is the
                 // thing in doubt whenever this is asked for.
-                if restart::is_request(&line) {
-                    restart::send(session);
+                if recovery::is_shell_restart(&line) {
+                    recovery::restart_shell(session);
                 } else {
                     sending::to_channel(session, SHELL, format!("{line}\n").as_bytes());
                 }

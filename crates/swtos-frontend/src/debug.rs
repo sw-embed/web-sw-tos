@@ -3,7 +3,7 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/debug.rs
-//!   source commit: 60e6a57 (committed tree)
+//!   source commit: 5a25f22 (committed tree)
 //!   vendored:      2026-09-01
 //!
 //! Adapted: `DebugMap::load(path)` replaced by `from_json`. There is no

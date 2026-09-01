@@ -52,17 +52,26 @@ pub fn offer_hello(session: &mut Session) {
     session.transport.next_hello = session.tick.wrapping_add(HELLO_RETRY);
 }
 
-/// Time ticks, the resource request, and the first greeting, once framed.
+/// Time ticks, the resource request, and the first greeting.
+///
+/// The footer clock is updated before the framed guard, on purpose. It is the
+/// frontend's own clock, not the target's, and it has to keep moving when
+/// nothing is answering: a frozen clock is exactly how a wedged session looked
+/// last time, which made a stall indistinguishable from a quiet one at a
+/// glance. Everything below the guard is a request to the target and belongs
+/// behind it.
 pub fn periodic(session: &mut Session, clock: &impl Clock) {
-    if session.transport.decoder.mode() != Mode::Framed {
-        return;
+    if session.transport.decoder.mode() == Mode::Framed {
+        greet_once(session);
     }
-    greet_once(session);
     if !session.tick.is_multiple_of(PERIODIC) {
         return;
     }
     let (display, centiseconds) = wall(clock.local());
     session.panes.desktop.set_clock(display);
+    if session.transport.decoder.mode() != Mode::Framed {
+        return;
+    }
     for (kind, value) in [
         (FrameType::Uptime, session.tick),
         (FrameType::WallClock, centiseconds),

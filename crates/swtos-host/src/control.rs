@@ -35,3 +35,15 @@ pub fn heartbeat_frame(tick: u32) -> [u8; 5] {
 pub fn restart_request() -> [u8; 2] {
     [0xff, 4]
 }
+
+/// Ask the target for a warm reboot.
+///
+/// Where a shell restart rewinds endpoint 1 and keeps everything else, this
+/// tears the system down and builds it again: child processes, the preemption
+/// sidecar, the TTYs and the allocator. The kernel defers all of that to a
+/// safe shell boundary before rewinding, so the request is the same shape as
+/// a restart -- raised by the interrupt handler, acted on by the kernel when
+/// it is next somewhere it can be.
+pub fn reboot_request() -> [u8; 2] {
+    [0xff, 5]
+}
