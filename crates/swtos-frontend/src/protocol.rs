@@ -4,7 +4,7 @@
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/protocol.rs
 //!   source commit: 60e6a57 (committed tree)
-//!   vendored:      2026-09-01
+//!   vendored:      2026-09-02
 //!
 //! Vendored unmodified.
 

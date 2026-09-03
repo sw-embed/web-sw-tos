@@ -142,7 +142,7 @@ Every local change to a vendored file, so re-vendoring is mechanical rather
 than archaeological. Re-vendor by copying upstream fresh, then walking this
 table.
 
-Current vendoring: **sw-tos 5a25f22**.
+Current vendoring: **sw-tos 4bfe19a**.
 
 | File | Kind | Change |
 |---|---|---|
@@ -169,6 +169,19 @@ filesystem, and no `Instant`. Every patch that existed because this project
 wanted different behaviour is gone.
 
 ### What this re-vendor taught
+
+`debug.rs` grew `help_lines()`, and taking it whole is the point: the debugger
+pane's help is now upstream's list, so the two frontends cannot describe the
+same commands differently. Only the display of it lives here.
+
+Where the two do differ is when it is shown. Upstream reprints it on a rewind
+by watching the shell's own banners rather than by remembering what it sent,
+because a rewind can be asked for in ways the frontend never sees -- `kill 1`
+or `reboot` typed at the prompt. That reasoning transfers exactly, so
+`routing.rs` watches for the same two banners on channel zero. Watching what
+we sent would have been simpler and would have missed the cases that matter.
+
+### What the 5a25f22 re-vendor taught
 
 Upstream ran rustfmt over the frontend this cycle, so all four vendored files
 came back reformatted. That is churn the patch inventory absorbs without

@@ -15,8 +15,20 @@ pub const CHANNEL: u8 = 254;
 
 /// Greet, and ask the target to identify itself.
 pub fn greet(desktop: &mut Desktop) -> Vec<u8> {
-    desktop.push_channel(CHANNEL, b"SWTOS debugger: type help\n");
+    desktop.push_channel(CHANNEL, b"SWTOS debugger\n");
+    show_help(desktop);
     identity_request()
+}
+
+/// Put the debugger's own help in its pane.
+///
+/// Shown when the session opens and again whenever the target says it has been
+/// rewound, because a restart or a reboot is exactly the moment someone is
+/// looking for a way out with nothing else left on screen to go on.
+pub fn show_help(desktop: &mut Desktop) {
+    for line in swtos_frontend::debug::help_lines() {
+        desktop.push_channel(CHANNEL, format!("{line}\n").as_bytes());
+    }
 }
 
 /// Handle one key typed at the Debugger pane. Returns a DEBUG_REQUEST payload

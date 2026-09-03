@@ -157,15 +157,27 @@ fn a_warm_reboot_brings_the_shell_back() {
     settle(&mut session);
     settle(&mut session);
     assert_eq!(session.transport.decoder.mode(), Mode::Framed);
-    let before = screen(&session).matches("MENU").count();
+
+    // The session opens by saying what it can do, rather than showing a
+    // keypad of numbers over a prompt called "Choice:".
+    let opening = screen(&session);
+    assert!(
+        opening.contains("help=commands"),
+        "the menu does not point at the command list: {opening}"
+    );
+
+    let before = screen(&session).matches("help=commands").count();
 
     prefix(&mut session, "B");
     settle(&mut session);
     settle(&mut session);
 
+    // A reboot ends by restarting the shell, which re-enters the launcher and
+    // reprints the list -- the moment it is most wanted, because the screen
+    // has just been cleared of whatever went wrong.
     let after = screen(&session);
     assert!(
-        after.matches("MENU").count() > before,
+        after.matches("help=commands").count() > before,
         "the reboot request never reached the target: {after}"
     );
 }

@@ -13,29 +13,28 @@ deployed from a clean checkout.
 | Field | Value |
 |---|---|
 | Source repository | `sw-embed/sw-tos` |
-| Source commit | `5a25f22f416b721f84dcd08a8cb0eaecb3169099` |
+| Source commit | `4bfe19a40a634d8d2243cf10ede1c4b233b6047c` |
 | Source path | `build/scheduled-shell/` |
 | Vendored on | 2026-09-01 (re-vendored) |
 | Build recipe | `just scheduled-shell-build` |
 
-This pair was built in a throwaway clone of `sw-tos` at `5a25f22`, with the
-gitignored `tools/bin` toolchain copied in, because the `sw-tos` checkout was
-then on an earlier commit with hardware testing running against it and building
-there would have replaced the artifacts under test. `sw-tos` itself was never
-written to.
+This pair was built in a throwaway clone of `sw-tos` at `4bfe19a`, with the
+gitignored `tools/bin` toolchain copied in. `sw-tos` itself is never written
+to. Building outside the source checkout was first done because hardware
+testing was running against it; it is kept because it is the only way to be
+certain which tree an image came from, and it costs a clone.
 
-That clone has since been confirmed unnecessary and, more usefully, harmless:
-once the checkout advanced to `5a25f22` and rebuilt, its `program.bin` was
-byte-identical to the one vendored here, SHA-256 and all. The build is
-reproducible across trees, which is what makes building outside the source
-checkout a legitimate way to vendor rather than a shortcut.
+It is verifiably the same image either way. The previous vendoring was built
+this way and then compared against the `sw-tos` checkout once that caught up:
+byte-identical, SHA-256 and all. This one matches the `build_id` of the
+checkout's own build too.
 
 ## Artifacts
 
 | File | Size | Role |
 |---|---|---|
-| `program.bin` | 28,265 bytes | The preemptive-multitasking image, loaded at address 0 |
-| `program.debug.json` | 1,922,725 bytes | Symbol, function, and instruction map for the debugger pane |
+| `program.bin` | 28,308 bytes | The preemptive-multitasking image, loaded at address 0 |
+| `program.debug.json` | 1,925,294 bytes | Symbol, function, and instruction map for the debugger pane |
 
 ## Identity
 
@@ -45,10 +44,10 @@ be replaced together.
 | Field | Value |
 |---|---|
 | `format` | `swtos-debug-v1` |
-| `build_id` | `crc24:5224df` |
+| `build_id` | `crc24:d10c7a` |
 | `build_id_size` | 9488 |
-| `image_size` | 28265 |
-| `image_sha256` | `35df72c254ed1a15431287503f05ae4c8c625ac406fb71c00842f1db0aa18d0c` |
+| `image_size` | 28308 |
+| `image_sha256` | `acc21b3f6dc57843b07b3a4682a9792b4143a680c43f3f039fe9dedc9e55105f` |
 
 `build_id` is the identity the SWTOS debugger's identity opcode returns, as a
 CRC over the image's immutable range. `crates/swtos-host/src/image.rs` mirrors

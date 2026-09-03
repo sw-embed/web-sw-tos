@@ -35,10 +35,7 @@ pub fn route(panes: &mut Panes, console: &mut Console, now: Millis, item: Stream
 /// One decoded frame.
 fn frame_arrived(panes: &mut Panes, console: &mut Console, now: Millis, frame: Frame) {
     match frame.kind {
-        FrameType::TtyOutput => {
-            panes::open_for_output(&mut panes.desktop, frame.channel);
-            panes.desktop.push_channel(frame.channel, &frame.payload);
-        }
+        FrameType::TtyOutput => tty_output(panes, &frame),
         FrameType::ChannelOpen | FrameType::ChannelClose => {
             panes::occupancy_changed(&mut panes.desktop, &frame);
         }
@@ -55,6 +52,26 @@ fn frame_arrived(panes: &mut Panes, console: &mut Console, now: Millis, frame: F
         kind => panes
             .desktop
             .set_error(Some(format!("unhandled frame {kind:?}"))),
+    }
+}
+
+/// Banners the target prints when it has rewound itself.
+///
+/// Read from the shell's own output rather than from what this frontend sent,
+/// because a rewind can be asked for in ways this frontend never sees: `kill 1`
+/// or `reboot` typed at the prompt, or an escape sent by another tool.
+const REWIND_BANNERS: [&str; 2] = ["SHELL RESTARTED", "SYSTEM REBOOTED"];
+
+/// Terminal output for one channel, and the one thing worth reading in it.
+fn tty_output(panes: &mut Panes, frame: &Frame) {
+    panes::open_for_output(&mut panes.desktop, frame.channel);
+    let rewound = frame.channel == SHELL && {
+        let text = String::from_utf8_lossy(&frame.payload);
+        REWIND_BANNERS.iter().any(|banner| text.contains(banner))
+    };
+    panes.desktop.push_channel(frame.channel, &frame.payload);
+    if rewound {
+        debugger::show_help(&mut panes.desktop);
     }
 }
 

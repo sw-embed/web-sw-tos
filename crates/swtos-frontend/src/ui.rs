@@ -3,8 +3,8 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/ui.rs
-//!   source commit: 5a25f22 (committed tree)
-//!   vendored:      2026-09-01
+//!   source commit: 4bfe19a (committed tree)
+//!   vendored:      2026-09-02
 //!
 //! Adapted: adds `Cell`, `Color`, `Attrs`, and a `render_grid` adapter
 //! over upstream's `render`. Nothing else -- ended panes, clearing, pane

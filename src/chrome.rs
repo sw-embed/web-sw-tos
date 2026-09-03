@@ -8,6 +8,9 @@ use yew::prelude::*;
 
 const REPOSITORY: &str = "https://github.com/sw-embed/web-sw-tos";
 
+/// The sibling gallery of COR24 browser demos this one belongs to.
+const DEMOS: &str = "https://sw-embed.github.io/web-sw-cor24-demos/";
+
 /// Screen geometries. `fit` is first and is the default: a terminal that
 /// occupies a tenth of the window looks unfinished, and with sixteen process
 /// slots the extra rows are the difference between panes you can read and
@@ -111,6 +114,8 @@ pub fn footer() -> Html {
             <span>{ "MIT License" }</span>
             { html! { <span class="footer-sep">{ "\u{00b7}" }</span> } }
             <a href={REPOSITORY} target="_blank">{ "Repository" }</a>
+            { html! { <span class="footer-sep">{ "\u{00b7}" }</span> } }
+            <a href={DEMOS} target="_blank">{ "COR24 Demos" }</a>
             { html! { <span class="footer-sep">{ "\u{00b7}" }</span> } }
             { build_info() }
         </footer>

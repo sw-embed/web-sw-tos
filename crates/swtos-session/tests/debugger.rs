@@ -16,15 +16,16 @@ fn type_line(console: &mut Console, desktop: &mut Desktop, line: &str) -> Option
 }
 
 /// Render the Debugger pane zoomed to the full screen. Unzoomed it is half
-/// the width and the help line is clipped, which is a rendering artefact
-/// rather than anything about the console.
+/// the width, and clipping would be a rendering artefact rather than anything
+/// about the console.
+///
+/// A realistic width now: upstream broke the help into grouped lines under
+/// seventy characters each, so this no longer has to render wider than any
+/// real screen to keep the tail of one long line on it.
 fn screen(desktop: &mut Desktop) -> String {
     desktop.command(b'3');
     desktop.command(b'z');
-    // Rendered wider than any real screen: the help line runs past 150
-    // characters, so a realistic width clips its tail and an assertion about
-    // the far end would be testing the renderer, not the console.
-    let text = render(desktop, 220, 50);
+    let text = render(desktop, 120, 50);
     desktop.command(b'z');
     text
 }
@@ -101,4 +102,74 @@ fn a_plain_command_is_not_passed_to_the_shell() {
     let (mut console, mut desktop) = (debugger::console(), Desktop::default());
     type_line(&mut console, &mut desktop, "regs 2");
     assert!(console.pending.take().is_none());
+}
+
+/// The pane says what it can do without being asked.
+///
+/// It used to open with "type help", which keeps every command behind a word
+/// you have to already know.
+#[test]
+fn the_pane_opens_with_its_commands_listed() {
+    let mut desktop = Desktop::default();
+    debugger::greet(&mut desktop);
+    let text = screen(&mut desktop);
+    assert!(text.contains("regs"), "opened without its commands: {text}");
+    assert!(
+        text.contains("!ps -l"),
+        "opened without the shell escape: {text}"
+    );
+    assert!(
+        !text.contains("type help"),
+        "still hiding its commands behind a word: {text}"
+    );
+}
+
+/// A rewind is exactly when the help is wanted, because the screen has just
+/// been cleared of whatever went wrong.
+#[test]
+fn a_rewind_the_target_announces_reprints_the_help() {
+    use swtos_frontend::protocol::{Frame, FrameType, StreamItem};
+    use swtos_session::routing;
+    use swtos_session::state::Panes;
+
+    let mut panes = Panes {
+        desktop: Desktop::default(),
+        resources: Default::default(),
+    };
+    let mut console = debugger::console();
+
+    // Not greeted: this must come from the banner alone.
+    let banner = |text: &str| {
+        StreamItem::Frame(Frame {
+            kind: FrameType::TtyOutput,
+            channel: routing::SHELL,
+            payload: text.as_bytes().to_vec(),
+        })
+    };
+    routing::route(&mut panes, &mut console, 0.0, banner("SHELL RESTARTED\n"));
+    assert!(
+        screen(&mut panes.desktop).contains("regs"),
+        "a restart left the pane without its commands"
+    );
+
+    let mut panes = Panes {
+        desktop: Desktop::default(),
+        resources: Default::default(),
+    };
+    routing::route(&mut panes, &mut console, 0.0, banner("SYSTEM REBOOTED\n"));
+    assert!(
+        screen(&mut panes.desktop).contains("regs"),
+        "a reboot left the pane without its commands"
+    );
+
+    // Ordinary shell output must not trigger it, or the pane fills with help.
+    let mut panes = Panes {
+        desktop: Desktop::default(),
+        resources: Default::default(),
+    };
+    routing::route(&mut panes, &mut console, 0.0, banner("READY\n"));
+    assert!(
+        !screen(&mut panes.desktop).contains("regs"),
+        "ordinary output was mistaken for a rewind"
+    );
 }
