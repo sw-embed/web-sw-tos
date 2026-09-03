@@ -15,10 +15,10 @@ set -euo pipefail
 # asset. The runtime fetch of program.debug.json is relative and works either
 # way, which is why it needs no rewriting here.
 #
-# First run creates ../sw-tos-live as a fresh git repo and commits; then:
-#   1. create an EMPTY repo sw-embed/sw-tos-live on GitHub (no README/license)
-#   2. git -C ../sw-tos-live remote add origin git@github.com:sw-embed/sw-tos-live.git
-#   3. git -C ../sw-tos-live push -u origin main
+# First run creates ../swtos-live as a fresh git repo and commits; then:
+#   1. create an EMPTY repo sw-embed/swtos-live on GitHub (no README/license)
+#   2. git -C ../swtos-live remote add origin git@github.com:sw-embed/swtos-live.git
+#   3. git -C ../swtos-live push -u origin main
 #   4. Repo Settings -> Pages: Source = main / root; confirm the custom domain
 #      (read from the CNAME file); enable Enforce HTTPS once the cert lands.
 #   5. DNS: CNAME swtos -> sw-embed.github.io
@@ -27,7 +27,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 REL_DIST="$PROJECT_DIR/dist-release"
-MIRROR="${MIRROR:-$PROJECT_DIR/../sw-tos-live}"
+MIRROR="${MIRROR:-$PROJECT_DIR/../swtos-live}"
 DOMAIN="swtos.softwarewrighter.com"
 
 # Refuse to ship what has not been through the gate. A stable release is the
@@ -81,8 +81,8 @@ echo "=== Stable release built in $MIRROR (web-sw-tos $COMMIT, image $IMAGE) ===
 if ! git -C "$MIRROR" remote get-url origin >/dev/null 2>&1; then
     cat <<NEXT
 Next (first time only):
-  1. Create an EMPTY repo sw-embed/sw-tos-live on GitHub (no README/license).
-  2. git -C $MIRROR remote add origin git@github.com:sw-embed/sw-tos-live.git
+  1. Create an EMPTY repo sw-embed/swtos-live on GitHub (no README/license).
+  2. git -C $MIRROR remote add origin git@github.com:sw-embed/swtos-live.git
   3. git -C $MIRROR push -u origin main
   4. Repo Settings -> Pages: Source = main / root; custom domain $DOMAIN
      (from CNAME); enable Enforce HTTPS after the cert provisions.

@@ -21,7 +21,7 @@ Part of the [Software Wrighter COR24 Tools Project](https://sw-embed.github.io/w
 | Stable | <https://swtos.softwarewrighter.com/> | Only when a release is cut |
 
 The stable channel is served from
-[`sw-embed/sw-tos-live`](https://github.com/sw-embed/sw-tos-live), a repository
+[`sw-embed/swtos-live`](https://github.com/sw-embed/swtos-live), a repository
 holding nothing but the built site, so the public URL stays put while
 development continues here.
 
