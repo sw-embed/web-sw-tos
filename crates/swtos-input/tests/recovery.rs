@@ -23,9 +23,9 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
     haystack.windows(needle.len()).any(|slice| slice == needle)
 }
 
-/// Press Ctrl-A then one key.
+/// Press the prefix then one key.
 fn prefix(session: &mut Session, key: &str) {
-    dispatch::key(session, "a", true);
+    dispatch::key(session, dispatch::PREFIX_KEY, true);
     dispatch::key(session, key, false);
 }
 
@@ -158,15 +158,17 @@ fn a_warm_reboot_brings_the_shell_back() {
     settle(&mut session);
     assert_eq!(session.transport.decoder.mode(), Mode::Framed);
 
-    // The session opens by saying what it can do, rather than showing a
-    // keypad of numbers over a prompt called "Choice:".
+    // The session opens by saying what it can do, rather than showing a keypad
+    // of numbers. The `help=commands` hint that carried this last round is
+    // gone: the list itself prints on the way in, so the hint was saying twice
+    // what was said better once.
     let opening = screen(&session);
     assert!(
-        opening.contains("help=commands"),
-        "the menu does not point at the command list: {opening}"
+        opening.contains("uname"),
+        "the shell did not print its command list on the way in: {opening}"
     );
 
-    let before = screen(&session).matches("help=commands").count();
+    let before = screen(&session).matches("uname").count();
 
     prefix(&mut session, "B");
     settle(&mut session);
@@ -177,7 +179,7 @@ fn a_warm_reboot_brings_the_shell_back() {
     // has just been cleared of whatever went wrong.
     let after = screen(&session);
     assert!(
-        after.matches("help=commands").count() > before,
+        after.matches("uname").count() > before,
         "the reboot request never reached the target: {after}"
     );
 }

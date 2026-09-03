@@ -295,10 +295,14 @@ becomes two in-process byte queues. Preemption stays host-driven: a five-byte
   uses `render_grid()` and paints cells directly.
 - **`render_grid()` returns cells, not `char`.** See the ANSI-color section of
   `docs/plan.md`; this is the one decision that keeps color additive.
-- **Ctrl-A must `preventDefault`.** It is select-all in a browser and the
-  frontend prefix key here.
+- **The prefix key must `preventDefault`.** It is `Ctrl-O` since sw-tos
+  `f9197df` (was `Ctrl-A`), and in a browser that is the open-file dialog, so
+  it still has to be stopped from reaching the page. Name it from
+  `swtos_input::dispatch::PREFIX_KEY` / `PREFIX_LABEL` rather than spelling it
+  out: the screen must never advertise a key that differs from the one that
+  arms.
 - **No mouse, no scrollbars, no copy/paste.** Layout, focus, zoom, and
-  scrolling are Ctrl-A commands only, exactly as in the CLI.
+  scrolling are prefix commands only, exactly as in the CLI.
 - Verify the `wasm32-unknown-unknown` build early. The emulator crate reaches
   `std::fs` in its SPI peripherals and `SystemTime::now()` in the I2C registry;
   `resource.rs` uses `Instant`, which panics on that target.

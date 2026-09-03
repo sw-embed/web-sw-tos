@@ -67,8 +67,17 @@ impl Component for App {
         let listener = browser::on_keydown(ctx.link().clone());
         browser::fetch_debug_map(ctx.link().clone());
         let resize = browser::on_resize(ctx.link().clone());
+        let mut session = swtos_session::driver::session();
+        // Name the prefix the help overlay prints, from the one constant that
+        // also arms it. Upstream defaults to the same key, but a default is
+        // not a promise: if it ever changes, the screen would name a key that
+        // does nothing here.
+        session
+            .panes
+            .desktop
+            .set_prefix_label(swtos_input::dispatch::PREFIX_LABEL);
         Self {
-            session: swtos_session::driver::session(),
+            session,
             geometry: 0,
             fit: (80, 24),
             fitted: false,

@@ -43,7 +43,7 @@ fn ctrl_covers_the_full_control_range() {
 #[test]
 fn ctrl_bracket_closes_help() {
     let mut session = driver::session();
-    dispatch::key(&mut session, "a", true);
+    dispatch::key(&mut session, dispatch::PREFIX_KEY, true);
     dispatch::key(&mut session, "?", false);
     assert!(session.panes.desktop.help_enabled(), "help did not open");
 
@@ -58,7 +58,7 @@ fn ctrl_bracket_closes_help() {
 #[test]
 fn ctrl_bracket_leaves_copy_mode() {
     let mut session = driver::session();
-    dispatch::key(&mut session, "a", true);
+    dispatch::key(&mut session, dispatch::PREFIX_KEY, true);
     dispatch::key(&mut session, "y", false);
     assert!(
         session.panes.desktop.copy_mode_enabled(),

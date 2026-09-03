@@ -5,7 +5,7 @@
 //! anything: nothing drains the handler's ring, so nothing downstream of it
 //! can ever see the request. The handler is the only code still running.
 //!
-//! Three ways in: `Ctrl-A k` restarts the shell, `Ctrl-A B` reboots, and
+//! Three ways in: prefix-`k` restarts the shell, prefix-`B` reboots, and
 //! `!kill 1` typed at the Debugger pane restarts. That last one is not
 //! injected as a shell command the way `!ps -l` is -- injection needs the
 //! shell to be reading, which is precisely what is in doubt.

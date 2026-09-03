@@ -13,28 +13,30 @@ deployed from a clean checkout.
 | Field | Value |
 |---|---|
 | Source repository | `sw-embed/sw-tos` |
-| Source commit | `4bfe19a40a634d8d2243cf10ede1c4b233b6047c` |
+| Source commit | `f9197df63d7aa55adc049fa2907b10e04ac2bd87` |
 | Source path | `build/scheduled-shell/` |
 | Vendored on | 2026-09-01 (re-vendored) |
 | Build recipe | `just scheduled-shell-build` |
 
-This pair was built in a throwaway clone of `sw-tos` at `4bfe19a`, with the
+This pair was built in a throwaway clone of `sw-tos` at `f9197df`, with the
 gitignored `tools/bin` toolchain copied in. `sw-tos` itself is never written
-to. Building outside the source checkout was first done because hardware
-testing was running against it; it is kept because it is the only way to be
-certain which tree an image came from, and it costs a clone.
+to. Building outside the source checkout is the only way to be certain which
+tree an image came from, and it costs a clone; an earlier vendoring built this
+way was later compared against the checkout's own build and was byte-identical,
+SHA-256 and all.
 
-It is verifiably the same image either way. The previous vendoring was built
-this way and then compared against the `sw-tos` checkout once that caught up:
-byte-identical, SHA-256 and all. This one matches the `build_id` of the
-checkout's own build too.
+`sw-tos` has uncommitted work on `hal/cor24/catalog-spawn.s` that is **not**
+in this image: `_release_slot` clearing the preemption sidecar as well as the
+statistics. That is the fix for a kill that is accepted and never serviced, so
+it is worth having, and it is not vendored here because it is not committed and
+an image must name a commit that contains it.
 
 ## Artifacts
 
 | File | Size | Role |
 |---|---|---|
-| `program.bin` | 28,308 bytes | The preemptive-multitasking image, loaded at address 0 |
-| `program.debug.json` | 1,925,294 bytes | Symbol, function, and instruction map for the debugger pane |
+| `program.bin` | 28,221 bytes | The preemptive-multitasking image, loaded at address 0 |
+| `program.debug.json` | 1,919,549 bytes | Symbol, function, and instruction map for the debugger pane |
 
 ## Identity
 
@@ -44,10 +46,10 @@ be replaced together.
 | Field | Value |
 |---|---|
 | `format` | `swtos-debug-v1` |
-| `build_id` | `crc24:d10c7a` |
+| `build_id` | `crc24:a89715` |
 | `build_id_size` | 9488 |
-| `image_size` | 28308 |
-| `image_sha256` | `acc21b3f6dc57843b07b3a4682a9792b4143a680c43f3f039fe9dedc9e55105f` |
+| `image_size` | 28221 |
+| `image_sha256` | `9128d0af2f4afd44e2bcb9f5b8e304eba2c9eaef95c519b96c3bcc947d8c202c` |
 
 `build_id` is the identity the SWTOS debugger's identity opcode returns, as a
 CRC over the image's immutable range. `crates/swtos-host/src/image.rs` mirrors

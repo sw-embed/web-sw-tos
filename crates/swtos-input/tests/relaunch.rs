@@ -51,9 +51,9 @@ fn type_line(session: &mut Session, text: &str) {
     settle(session);
 }
 
-/// Focus a pane by its Ctrl-A number.
+/// Focus a pane by its prefix-number.
 fn focus(session: &mut Session, number: &str) {
-    dispatch::key(session, "a", true);
+    dispatch::key(session, dispatch::PREFIX_KEY, true);
     dispatch::key(session, number, false);
 }
 

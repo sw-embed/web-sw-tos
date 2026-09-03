@@ -3,7 +3,7 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/ui.rs
-//!   source commit: 4bfe19a (committed tree)
+//!   source commit: f9197df (committed tree)
 //!   vendored:      2026-09-02
 //!
 //! Adapted: adds `Cell`, `Color`, `Attrs`, and a `render_grid` adapter
@@ -214,6 +214,8 @@ pub struct Desktop {
     zoomed: bool,
     help: bool,
     connected: bool,
+    /// How the host-command prefix is spelled, for the help to name it.
+    prefix_label: String,
     clock: String,
     error: Option<String>,
     copy_mode: bool,
@@ -238,6 +240,7 @@ impl Desktop {
             zoomed: false,
             help: false,
             connected: true,
+            prefix_label: "Ctrl-O".to_string(),
             clock: "--:--:--".into(),
             error: None,
             copy_mode: false,
@@ -449,7 +452,7 @@ impl Desktop {
 
     /// Put back any system pane that has been closed.
     ///
-    /// Ctrl-A x removes whatever holds focus, and closing Resources or the
+    /// The prefix and x remove whatever holds focus, and closing Resources or the
     /// debugger was otherwise unrecoverable: reloading a saved layout is the
     /// only other route back and helps only if a layout was ever saved. Each
     /// missing pane returns at its canonical position, so the numbering a
@@ -546,6 +549,11 @@ impl Desktop {
         self.focus = 0;
     }
 
+    /// Name the host-command prefix, so the help describes the running one.
+    pub fn set_prefix_label(&mut self, label: impl Into<String>) {
+        self.prefix_label = label.into();
+    }
+
     pub fn set_connected(&mut self, connected: bool) {
         self.connected = connected;
     }
@@ -629,6 +637,11 @@ impl Desktop {
         let mut canvas = vec![vec![' '; width]; body_height];
 
         if self.help {
+            // Every key here is the second half of a two-key sequence, which
+            // the list never said: read alone it looks like plain keystrokes,
+            // and pressing them alone types into the focused pane instead.
+            let title = format!("Help -- press {} first, then:", self.prefix_label);
+            let close = format!("close help: q, Escape, or {} ?", self.prefix_label);
             draw_box(
                 &mut canvas,
                 BoxSpec {
@@ -636,7 +649,7 @@ impl Desktop {
                     y: 0,
                     width,
                     height: body_height,
-                    title: "Help",
+                    title: &title,
                     lines: &[
                         "1-9 focus  n next  p previous  z zoom  s split  x close",
                         "l clear pane  c close ended  S restore-system-panes",
@@ -647,7 +660,7 @@ impl Desktop {
                         "r reconnect/redraw  e target-Escape  k restart shell",
                         "B warm SWTOS reboot (ISR request)",
                         "? help  d detach",
-                        "close help: q, Escape, or ?",
+                        &close,
                     ],
                     horizontal_offset: 0,
                     focused: true,
@@ -792,7 +805,7 @@ impl Desktop {
 
     fn label_for(&self, index: usize) -> String {
         let pane = &self.panes[index];
-        // Two numbers matter and they are not the same: Ctrl-A takes the pane
+        // Two numbers matter and they are not the same: the prefix takes the pane
         // number, while the debugger, mon and ps all take the endpoint. Naming
         // only the first invites killing endpoint 12 while watching pane 12,
         // which shows a different process. The pane number leads because it
@@ -987,7 +1000,7 @@ mod tests {
         desktop.command(b'S');
         let layout = desktop.layout();
         assert_eq!(layout.len(), PaneKind::ALL.len());
-        // Restored at its canonical position, so Ctrl-A 4 still reaches it.
+        // Restored at its canonical position, so prefix-4 still reaches it.
         desktop.command(b'3');
         assert_eq!(desktop.focused_kind(), PaneKind::Debugger);
         // Restoring again is a no-op rather than a duplicate.
@@ -1208,6 +1221,15 @@ mod tests {
         desktop.command(b'?');
         let help = desktop.render(60, 16);
         assert!(help.contains("1-9 focus"));
+        // The keys are the second half of a two-key sequence, and the screen
+        // has to say so: alone they type into the focused pane.
+        assert!(help.contains("press Ctrl-O first"), "{help}");
+
+        // And it names the prefix actually in use, not the default.
+        desktop.set_prefix_label("Ctrl-]");
+        let help = desktop.render(100, 24);
+        assert!(help.contains("press Ctrl-] first"), "{help}");
+        assert!(help.contains("Ctrl-] ?"), "{help}");
         desktop.command(b'q');
         assert!(!desktop.help_enabled());
         assert!(desktop.render(60, 16).contains("Shell *"));

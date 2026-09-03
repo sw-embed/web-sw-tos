@@ -16,7 +16,7 @@ a pty, created by `scripts/swtos-emulator-debug.py`:
 |---|---|
 | `tools/cor24-debug-adapter` | Hosts `EmulatorCore`, loads `program.bin` at 0, `run_batch(50_000)` in a 1 ms loop, decodes inbound frames, flushes modeled UART bytes out |
 | pty pair | Byte transport between the two processes |
-| `tools/te-rs` | Framed-transport decoder, tiled pane `Desktop`, Ctrl-A prefix commands, copy-mode scrollback, resource and debugger consoles |
+| `tools/te-rs` | Framed-transport decoder, tiled pane `Desktop`, prefix commands, copy-mode scrollback, resource and debugger consoles |
 
 In the browser all three collapse into one WASM module. The pty becomes two
 in-process byte queues. Everything else keeps its shape.
@@ -37,7 +37,7 @@ in-process byte queues. Everything else keeps its shape.
   `sw-tos` does not grow a WASM feature and does not depend on this repo.
 - **Rendering**: one fixed-size character grid (selectable 80x24 / 120x43),
   painted from the pane canvas. No mouse, no scrollbars, no copy/paste. Pane
-  layout, focus, zoom, and scrolling are driven entirely by Ctrl-A commands,
+  layout, focus, zoom, and scrolling are driven entirely by prefix commands,
   exactly as in the CLI.
 - **Delivery**: shell-first. Phase 1 ships one interactive Shell pane and is
   independently deployable; later phases add Application, Resources, Debugger,
@@ -128,7 +128,7 @@ How `te-rs` behaves today, read from `ui.rs` and the frame dispatch in
 | `ChannelClose` (4) | `release_channel` **removes the application pane outright**. Shell, Debugger, and Resources panes are retained regardless. |
 
 So today: a pane cannot be cleared at all -- there is no clear command in the
-Ctrl-A set, and the only way to discard output is `Ctrl-A x` to close the pane
+prefix set, and the only way to discard output is prefix-`x` to close the pane
 entirely. Titles change on open and on any `ChannelTitle` frame. Nothing is
 ever flagged as ended, because an ended application's pane has already
 disappeared.
@@ -139,7 +139,7 @@ copy may diverge, provided the divergence is deliberate and written down.
 **An ended application keeps its pane, flagged.** Removing the pane on
 `ChannelClose` destroys the program's final output at the exact moment the
 output becomes worth reading. The pane stays, its title gains an ` (ended)`
-suffix, and it stops accepting input. `Ctrl-A x` still closes it. This also
+suffix, and it stops accepting input. Prefix-`x` still closes it. This also
 answers the stale-output question directly: output after an app ends is not
 stale, it is the result, and it should persist until dismissed.
 
@@ -149,9 +149,9 @@ mistaken for the next one's. Separately, a pane can be cleared on demand --
 scrollback, the partial line, and the scroll offset.
 
 Both were local additions when this was written and both are upstream now, so
-the bindings are upstream's: `Ctrl-A l` clears the focused pane and `Ctrl-A c`
+the bindings are upstream's: prefix-`l` clears the focused pane and prefix-`c`
 closes the ended ones. The local versions were deleted rather than kept
-alongside; keeping them would have shadowed `Ctrl-A c`, whose meaning changed.
+alongside; keeping them would have shadowed prefix-`c`, whose meaning changed.
 
 Recording this here because the choice is not obvious from the reference
 implementation, and a later reader comparing the two frontends should find the
@@ -166,7 +166,9 @@ reason rather than assume drift.
 - `EmulatorCore::get_uart_output()` returns `&str`. The framed transport is
   binary, so the byte-exact path is `uart_log().entries()` filtered by
   `UartDirection::Output`, never the string accessor.
-- Ctrl-A is select-all in a browser. The key handler must intercept the prefix
+- The prefix is `Ctrl-O` (sw-tos `f9197df` moved it off `Ctrl-A`, which is
+  beginning-of-line to emacs fingers and wanted by the shell's line editing).
+  In a browser it is the open-file dialog, so the key handler must intercept it
   and `preventDefault`.
 - The emulator crate reaches `std::fs` in its SPI peripherals and
   `SystemTime::now()` in the I2C registry. SWTOS uses UART only here, but the
@@ -190,7 +192,7 @@ reason rather than assume drift.
 5. `emulator-pump` -- `run_batch` plus the 100 Hz heartbeat on a browser timer,
    with drain-and-reset UART collection.
 6. `terminal-grid` -- fixed-size character grid, selectable geometry.
-7. `keyboard-input` -- key capture to framed `TTY_INPUT`, Ctrl-A prefix
+7. `keyboard-input` -- key capture to framed `TTY_INPUT`, prefix
    interception, Escape and backspace handling.
 8. `deploy-shell-demo` -- build `pages/`, verify the live URL.
 
@@ -199,8 +201,8 @@ reason rather than assume drift.
 9. `application-panes` -- channel open/close/title, `run NAME --tty=new`.
 10. `resources-pane` -- `SnapshotAssembler` with generation discipline.
 11. `debugger-pane` -- identity, `regs`, and `kill` opcodes.
-12. `zoom-and-focus` -- Ctrl-A `1`-`9`, `n`, `s`, `x`, `a`, `z`.
-13. `copy-mode-scrollback` -- Ctrl-A `y`, arrows/hjkl, PgUp/PgDn, `g`/`G`, `q`.
+12. `zoom-and-focus` -- prefix `1`-`9`, `n`, `s`, `x`, `a`, `z`.
+13. `copy-mode-scrollback` -- prefix `y`, arrows/hjkl, PgUp/PgDn, `g`/`G`, `q`.
 14. `preemption-acceptance` -- the dual `cpu-hog` proof in the browser.
 15. `polish-and-deploy` -- help overlay, geometry selector, docs, final deploy.
 

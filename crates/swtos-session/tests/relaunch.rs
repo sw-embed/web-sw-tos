@@ -48,7 +48,10 @@ fn type_keys(session: &mut Session, keys: &[&str]) {
 fn the_menu_still_answers_after_a_program_ends() {
     let mut session = framed();
     let before = screen(&session);
-    assert!(before.contains("Choice"), "no menu to begin with: {before}");
+    // The prompt is "# " since sw-tos 808256b: one level, everything runs
+    // here, which is what every other shell says. It used to ask "Choice:" as
+    // though a number were the only answer.
+    assert!(before.contains("MENU"), "no menu to begin with: {before}");
 
     // Launch from the menu.
     type_keys(&mut session, &["1", "\n"]);
@@ -82,12 +85,12 @@ fn the_menu_still_answers_after_a_program_ends() {
     // Back at the Shell, the menu must answer again. The evidence is the
     // second program's own output: "Counter" is no evidence at all, because
     // the menu banner says "2=Counter" whether or not anything ran.
-    let marker = screen(&session).matches("Choice").count();
+    let marker = screen(&session).matches("MENU").count();
     type_keys(&mut session, &["2", "\n"]);
     settle(&mut session);
     let after = screen(&session);
     assert!(
-        after.matches("Choice").count() > marker,
+        after.matches("MENU").count() > marker,
         "the menu stopped answering after a program ended:\n{after}"
     );
     assert!(

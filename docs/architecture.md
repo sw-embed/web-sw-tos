@@ -142,7 +142,11 @@ Every local change to a vendored file, so re-vendoring is mechanical rather
 than archaeological. Re-vendor by copying upstream fresh, then walking this
 table.
 
-Current vendoring: **sw-tos 4bfe19a**.
+Current vendoring: **sw-tos f9197df**.
+
+The host-command prefix is `Ctrl-O`. Passages below written when it was
+`Ctrl-A` name it as it was, because they are describing when a decision was
+made; the binding they describe is unchanged, only the key that reaches it.
 
 | File | Kind | Change |
 |---|---|---|
@@ -169,6 +173,28 @@ filesystem, and no `Instant`. Every patch that existed because this project
 wanted different behaviour is gone.
 
 ### What this re-vendor taught
+
+The prefix moved to `Ctrl-O`, and upstream's reason for the move is worth
+keeping: `Ctrl-A` is beginning-of-line to anyone with emacs fingers and the
+shell wants it back once its line editing grows up. `Ctrl-J` was tried first
+and is a trap -- it is LF, so it arrives at the end of every pasted line and
+would swallow the Enter.
+
+The lesson that transfers is the second one in that commit. Upstream found its
+two test harnesses spelling the prefix as a bare byte in a dozen places, with
+one of them also passing `--prefix`, so the frontend under test and the keys
+sent to it could name different keys. The tests here had the same shape, with
+`"a"` written out at fourteen call sites. Both the arming and every label now
+come from `dispatch::PREFIX_KEY` and `PREFIX_LABEL`, including the status line
+and the help overlay, so the screen cannot advertise a key that does not work.
+
+One assertion had to be pulled apart rather than renamed. A test read
+`translate::to_bytes("a", true) == 0x01` under the comment "Ctrl-A is the
+prefix", which quietly conflated two jobs: translating a control letter, and
+intercepting the prefix before it reaches the target. They are separate now, so
+the translation stays true whatever the prefix is.
+
+### What the 4bfe19a re-vendor taught
 
 `debug.rs` grew `help_lines()`, and taking it whole is the point: the debugger
 pane's help is now upstream's list, so the two frontends cannot describe the

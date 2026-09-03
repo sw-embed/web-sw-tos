@@ -1,8 +1,8 @@
 //! Where a key goes: frontend command, local console, or the target.
 //!
 //! Four consumers sit in front of the target, in order. A bare modifier is
-//! dropped. A pending prefix makes this key a frontend command. Ctrl-A arms
-//! that prefix. Copy mode claims navigation. Only what none of them wants
+//! dropped. A pending prefix makes this key a frontend command. The prefix key
+//! arms that prefix. Copy mode claims navigation. Only what none of them wants
 //! reaches SWTOS.
 
 use crate::recovery;
@@ -11,6 +11,23 @@ use swtos_frontend::ui::PaneKind;
 use swtos_session::routing::SHELL;
 use swtos_session::state::Session;
 use swtos_session::{debugger, sending};
+
+/// The host-command prefix, named once.
+///
+/// Ctrl-O rather than Ctrl-A: Ctrl-A is beginning-of-line to anyone with emacs
+/// fingers, and the shell wants it once its line editing grows up. Ctrl-J was
+/// tried upstream and is a trap -- it is LF, so it arrives at the end of every
+/// pasted line and would swallow the Enter. Ctrl-O is neither a line ending
+/// nor flow control.
+///
+/// In a browser Ctrl-O is the open-file dialog, so it must be stopped from
+/// reaching the page. That was already true of Ctrl-A, which is select-all.
+pub const PREFIX_KEY: &str = "o";
+
+/// How to say it. The label the help overlay prints comes from here, so the
+/// screen cannot name a different key from the one that works -- which is
+/// exactly how upstream's two test harnesses drifted apart.
+pub const PREFIX_LABEL: &str = "Ctrl-O";
 
 /// Keys the help overlay claims for itself, taken without the prefix because
 /// the overlay tells the reader to press exactly these.
@@ -43,7 +60,7 @@ pub fn key(session: &mut Session, key: &str, ctrl: bool) -> Vec<u8> {
 }
 
 /// The prefix state machine: drop bare modifiers, run a pending command, or
-/// arm on Ctrl-A. `Some` means the key was consumed here.
+/// arm on the prefix key. `Some` means the key was consumed here.
 ///
 /// A bare modifier keydown is neither a command nor input. Without dropping
 /// it, it is consumed as the prefix command, so every binding needing Shift --
@@ -56,7 +73,7 @@ fn prefix(session: &mut Session, key: &str, ctrl: bool) -> Option<Vec<u8>> {
     if core::mem::take(&mut session.input.prefix_armed) {
         return Some(command(session, key));
     }
-    if ctrl && key.eq_ignore_ascii_case("a") {
+    if ctrl && key.eq_ignore_ascii_case(PREFIX_KEY) {
         session.input.prefix_armed = true;
         return Some(Vec::new());
     }

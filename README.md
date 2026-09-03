@@ -28,7 +28,7 @@ becomes an in-process virtual UART, and everything else keeps its shape --
 the same framed transport, the same pane model, and the same host-driven
 scheduler heartbeat that makes preemption work. The result is a simulated
 CLI in a web page: one fixed-size character grid that the frontend divides
-into panes, driven entirely by `Ctrl-A` commands exactly as on a real
+into panes, driven entirely by `Ctrl-O` commands exactly as on a real
 terminal.
 
 There is deliberately no mouse support, no scrollbars, and no copy/paste.
@@ -88,7 +88,7 @@ At the `Choice:` prompt, press a digit:
 | `5` | Multitask -- two processes interleaving |
 | `6` | UART test |
 
-Once the tiled frontend lands, the frontend prefix is `Ctrl-A`. Release it
+Once the tiled frontend lands, the frontend prefix is `Ctrl-O`. Release it
 before typing the command; each command needs its own prefix.
 
 | Prefix command | Action |

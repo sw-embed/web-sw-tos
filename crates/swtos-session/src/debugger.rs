@@ -13,9 +13,15 @@ use swtos_frontend::ui::Desktop;
 /// The Debugger pane's channel, from `PaneKind::Debugger::default_channel`.
 pub const CHANNEL: u8 = 254;
 
+/// Where typing goes.
+///
+/// The pane is already titled Debugger, so it never needed a line announcing
+/// itself; what it needed was somewhere the typing visibly starts, so the pane
+/// reads as one that takes commands rather than one that only shows them.
+const PROMPT: &[u8] = b"dbg ";
+
 /// Greet, and ask the target to identify itself.
 pub fn greet(desktop: &mut Desktop) -> Vec<u8> {
-    desktop.push_channel(CHANNEL, b"SWTOS debugger\n");
     show_help(desktop);
     identity_request()
 }
@@ -29,6 +35,7 @@ pub fn show_help(desktop: &mut Desktop) {
     for line in swtos_frontend::debug::help_lines() {
         desktop.push_channel(CHANNEL, format!("{line}\n").as_bytes());
     }
+    desktop.push_channel(CHANNEL, PROMPT);
 }
 
 /// Handle one key typed at the Debugger pane. Returns a DEBUG_REQUEST payload
@@ -38,7 +45,13 @@ pub fn show_help(desktop: &mut Desktop) {
 /// `docs/use-cases.md`: `!ps -l`, `!bg mon`, `!kill 3`.
 pub fn key(console: &mut Console, desktop: &mut Desktop, key: &str) -> Option<Vec<u8>> {
     match key {
-        "Enter" => enter(console, desktop),
+        // One place for the prompt rather than one per branch: a line handed
+        // to the shell and a line run here both leave the console ready.
+        "Enter" => {
+            let request = enter(console, desktop);
+            desktop.push_channel(CHANNEL, PROMPT);
+            request
+        }
         "Backspace" => {
             console.input.pop();
             desktop.push_channel(CHANNEL, &[0x08]);

@@ -61,7 +61,7 @@ pub fn fit() -> (usize, usize) {
 }
 
 /// The line under the screen. While the prefix is armed it becomes the
-/// command menu, which is the only place the Ctrl-A bindings are discoverable
+/// command menu, which is the only place the prefix bindings are discoverable
 /// without already knowing them.
 pub fn diagnostics(status: &Status, ms: f64) -> Html {
     let text = if status.prefix_armed {
@@ -78,9 +78,11 @@ pub fn diagnostics(status: &Status, ms: f64) -> Html {
             "plain (negotiating)"
         };
         format!(
-            "Ctrl-A then ? for commands   \u{2022}   transport {transport}   \
+            "{prefix} then ? for commands   \u{2022}   transport {transport}   \
              \u{2022}   tick {}   {ms:.1} ms/tick   uart-log {}",
-            status.tick, status.log_entries
+            status.tick,
+            status.log_entries,
+            prefix = swtos_input::dispatch::PREFIX_LABEL,
         )
     };
     html! { <div class="diagnostics">{ text }</div> }

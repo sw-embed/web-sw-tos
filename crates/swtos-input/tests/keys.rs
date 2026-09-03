@@ -33,12 +33,12 @@ fn control_keys_use_their_terminal_encodings() {
 #[test]
 fn printable_and_ctrl_letters_map_as_a_terminal_would() {
     assert_eq!(translate::to_bytes("1", false), b"1");
-    assert_eq!(
-        translate::to_bytes("a", true),
-        vec![0x01],
-        "Ctrl-A is the prefix"
-    );
+    assert_eq!(translate::to_bytes("a", true), vec![0x01]);
     assert_eq!(translate::to_bytes("A", true), vec![0x01]);
+    // Translation and interception are separate jobs. Ctrl-O has a byte like
+    // any other control letter; what stops it reaching the target is dispatch
+    // arming the prefix, not translate refusing to encode it.
+    assert_eq!(translate::to_bytes(dispatch::PREFIX_KEY, true), vec![0x0f]);
     assert_eq!(translate::to_bytes("z", true), vec![0x1a]);
     for named in ["Shift", "ArrowUp", "F5", "CapsLock"] {
         assert!(
@@ -48,12 +48,12 @@ fn printable_and_ctrl_letters_map_as_a_terminal_would() {
     }
 }
 
-/// Ctrl-A must never reach the target: it arms the frontend instead.
+/// The prefix key must never reach the target: it arms the frontend instead.
 #[test]
 fn the_prefix_is_consumed_and_the_next_key_is_a_command() {
     let mut session = driver::session();
     assert!(
-        dispatch::key(&mut session, "a", true).is_empty(),
+        dispatch::key(&mut session, dispatch::PREFIX_KEY, true).is_empty(),
         "prefix leaked to target"
     );
     assert!(session.input.prefix_armed, "prefix did not arm");
@@ -69,7 +69,7 @@ fn the_prefix_is_consumed_and_the_next_key_is_a_command() {
 #[test]
 fn prefix_e_sends_escape_to_the_target() {
     let mut session = driver::session();
-    dispatch::key(&mut session, "a", true);
+    dispatch::key(&mut session, dispatch::PREFIX_KEY, true);
     assert_eq!(dispatch::key(&mut session, "e", false), vec![0x1b]);
 }
 
@@ -105,7 +105,7 @@ fn echo_shows_typing_but_not_control_bytes() {
 #[test]
 fn copy_mode_claims_navigation_and_releases_it_on_exit() {
     let mut session = driver::session();
-    dispatch::key(&mut session, "a", true);
+    dispatch::key(&mut session, dispatch::PREFIX_KEY, true);
     dispatch::key(&mut session, "y", false);
     assert!(
         dispatch::key(&mut session, "k", false).is_empty(),
@@ -119,16 +119,16 @@ fn copy_mode_claims_navigation_and_releases_it_on_exit() {
     );
 }
 
-/// docs/use-cases.md binds clear to `Ctrl-A l`; `c` shipped here first and is
+/// docs/use-cases.md binds clear to `prefix-l`; `c` shipped here first and is
 /// kept as an alias.
 #[test]
 fn both_clear_bindings_are_consumed_by_the_frontend() {
     for key in ["l", "c"] {
         let mut session = driver::session();
-        dispatch::key(&mut session, "a", true);
+        dispatch::key(&mut session, dispatch::PREFIX_KEY, true);
         assert!(
             dispatch::key(&mut session, key, false).is_empty(),
-            "Ctrl-A {key} leaked to the target instead of clearing"
+            "prefix-{key} leaked to the target instead of clearing"
         );
     }
 }
@@ -137,13 +137,13 @@ fn both_clear_bindings_are_consumed_by_the_frontend() {
 ///
 /// `?` and `S` are both produced by holding Shift, and the browser delivers
 /// that Shift as its own keydown first. Treating it as the prefix command
-/// swallowed it, leaving `Ctrl-A ?` and `Ctrl-A S` dead while unshifted
-/// bindings like `Ctrl-A h` worked -- which is exactly how it was reported.
+/// swallowed it, leaving `prefix-?` and `prefix-S` dead while unshifted
+/// bindings like `prefix-h` worked -- which is exactly how it was reported.
 #[test]
 fn a_shift_press_does_not_swallow_the_prefix() {
     for modifier in ["Shift", "Control", "Alt", "Meta", "CapsLock", "AltGraph"] {
         let mut session = driver::session();
-        dispatch::key(&mut session, "a", true);
+        dispatch::key(&mut session, dispatch::PREFIX_KEY, true);
         assert!(
             dispatch::key(&mut session, modifier, false).is_empty(),
             "{modifier} leaked to the target"
@@ -169,7 +169,7 @@ fn a_modifier_alone_sends_nothing() {
 #[test]
 fn debugger_keys_do_not_go_out_as_tty_input() {
     let mut session = driver::session();
-    dispatch::key(&mut session, "a", true);
+    dispatch::key(&mut session, dispatch::PREFIX_KEY, true);
     dispatch::key(&mut session, "3", false); // focus pane 3 = Debugger
     for key in ["h", "e", "l", "p", "Enter"] {
         assert!(

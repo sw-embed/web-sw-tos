@@ -2,7 +2,7 @@
 //!
 //! The overlay itself says "close help: q, Escape, or ?", and te-rs honours
 //! that by routing those three straight to the command table while help is
-//! open, without the prefix. A frontend that demands `Ctrl-A` first leaves the
+//! open, without the prefix. A frontend that demands the prefix first leaves the
 //! overlay stuck with no documented way out.
 
 use swtos_input::dispatch;
@@ -11,11 +11,11 @@ use swtos_session::state::Session;
 
 fn open_help() -> Session {
     let mut session = driver::session();
-    dispatch::key(&mut session, "a", true);
+    dispatch::key(&mut session, dispatch::PREFIX_KEY, true);
     dispatch::key(&mut session, "?", false);
     assert!(
         session.panes.desktop.help_enabled(),
-        "Ctrl-A ? did not open help"
+        "prefix-? did not open help"
     );
     session
 }
@@ -38,11 +38,11 @@ fn every_documented_key_closes_help() {
 #[test]
 fn the_prefix_still_closes_help() {
     let mut session = open_help();
-    dispatch::key(&mut session, "a", true);
+    dispatch::key(&mut session, dispatch::PREFIX_KEY, true);
     dispatch::key(&mut session, "?", false);
     assert!(
         !session.panes.desktop.help_enabled(),
-        "Ctrl-A ? did not toggle help off"
+        "prefix-? did not toggle help off"
     );
 }
 
