@@ -19,7 +19,7 @@ pub const CHANNEL: u8 = 254;
 /// The pane is already titled Debugger, so it never needed a line announcing
 /// itself; what it needed was somewhere the typing visibly starts, so the pane
 /// reads as one that takes commands rather than one that only shows them.
-const PROMPT: &[u8] = b"dbg ";
+const PROMPT: &[u8] = b"(dbg) ";
 
 /// How long a reply must stay quiet before the prompt follows it.
 const PROMPT_AFTER: Millis = 150.0;

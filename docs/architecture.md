@@ -142,7 +142,7 @@ Every local change to a vendored file, so re-vendoring is mechanical rather
 than archaeological. Re-vendor by copying upstream fresh, then walking this
 table.
 
-Current vendoring: **sw-tos 7a6227e**.
+Current vendoring: **sw-tos 99af617**.
 
 The host-command prefix is `Ctrl-O`. Passages below written when it was
 `Ctrl-A` name it as it was, because they are describing when a decision was
@@ -173,6 +173,26 @@ filesystem, and no `Instant`. Every patch that existed because this project
 wanted different behaviour is gone.
 
 ### What this re-vendor taught
+
+`list` now shows source rather than a second disassembly, and it does that by
+reading the `.s` files sitting beside the map. Neither exists here: the map is
+fetched as a static asset, and the assembly is not shipped at all -- at
+sixty-eight times the image on disk, the map alone is already the largest thing
+this demo could serve.
+
+No adaptation was needed for that, which is the point worth recording. Upstream
+had already written the no-assembly case: `source_dir` is `None`, `source_lines`
+returns before it touches a filesystem, and `list` falls back to the one line
+the map itself holds. The local patch is still the same two lines it has always
+been -- `load(path)` becomes `from_json(contents)` -- and it now simply leaves
+`source_dir` unset. A test drives the real path, real map and real target, and
+pins that the browser gets the fallback rather than an error or an empty pane.
+
+`use std::fs` stays in the vendored file even though nothing here can reach it.
+Deleting it would be a second patch to maintain, for no gain: the call sits
+behind a `None` that this build never sets.
+
+### What the 7a6227e re-vendor taught
 
 Two upstream fixes closed things this project had been carrying as known
 issues, and both are worth reading rather than just taking.

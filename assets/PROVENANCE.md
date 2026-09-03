@@ -13,17 +13,20 @@ deployed from a clean checkout.
 | Field | Value |
 |---|---|
 | Source repository | `sw-embed/sw-tos` |
-| Source commit | `7a6227e69a725a9fa33ba99a9807d6ba813fc5b2` |
+| Source commit | `99af617` (image byte-identical to `7a6227e`) |
 | Source path | `build/scheduled-shell/` |
 | Vendored on | 2026-09-01 (re-vendored) |
 | Build recipe | `just scheduled-shell-build` |
 
-This pair was built in a throwaway clone of `sw-tos` at `7a6227e`, with the
+This pair was built in a throwaway clone of `sw-tos` at `99af617`, with the
 gitignored `tools/bin` toolchain copied in. `sw-tos` itself is never written
 to. Building outside the source checkout is the only way to be certain which
-tree an image came from, and it costs a clone; an earlier vendoring built this
-way was later compared against the checkout's own build and was byte-identical,
-SHA-256 and all.
+tree an image came from, and it costs a clone.
+
+Neither commit since `7a6227e` touches an image source, and the rebuild proves
+it: same `build_id`, same size, same SHA-256, byte-identical to what was
+already vendored. The files were left alone rather than rewritten with
+identical bytes, so `git` shows no image churn for a cycle that changed none.
 
 ## Artifacts
 

@@ -3,7 +3,7 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/ui.rs
-//!   source commit: 7a6227e (committed tree)
+//!   source commit: 99af617 (committed tree)
 //!   vendored:      2026-09-02
 //!
 //! Adapted: adds `Cell`, `Color`, `Attrs`, and a `render_grid` adapter
