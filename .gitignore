@@ -1,6 +1,7 @@
 # Build artifacts
 /target
 /dist
+/dist-release
 
 # OS junk
 .DS_Store

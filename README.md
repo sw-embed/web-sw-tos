@@ -4,11 +4,35 @@ A preemptively multitasking microkernel running on an emulated 24-bit RISC
 CPU, driven from a tiled terminal frontend, entirely inside your browser.
 Rust compiled to WebAssembly, with no server and nothing to install.
 
-**[Live Demo](https://sw-embed.github.io/web-sw-tos/)**
+**[Stable demo](https://swtos.softwarewrighter.com/)** -- the one to share.
+
+**[Nightly demo](https://sw-embed.github.io/web-sw-tos/)** -- rebuilt on every
+push to `main`, so it may be mid-thought.
 
 ![SWTOS running in the browser](images/screenshot.png?ts=1787946868000)
 
 Part of the [Software Wrighter COR24 Tools Project](https://sw-embed.github.io/web-sw-cor24-demos/#/).
+
+## Two channels
+
+| Channel | URL | Moves |
+|---|---|---|
+| Nightly | <https://sw-embed.github.io/web-sw-tos/> | Every push to `main` |
+| Stable | <https://swtos.softwarewrighter.com/> | Only when a release is cut |
+
+The stable channel is served from
+[`sw-embed/sw-tos-live`](https://github.com/sw-embed/sw-tos-live), a repository
+holding nothing but the built site, so the public URL stays put while
+development continues here.
+
+Cut a release with `./scripts/release-stable.sh`, then push the mirror. It runs
+the full gate first and refuses a dirty tree: the stable build is the one a
+stranger sees.
+
+It also **rebuilds** rather than copying `pages/`. The nightly build bakes
+`--public-url /web-sw-tos/` into every asset URL for the project-pages subpath,
+and a custom domain serves from the root, so a copied `pages/` would 404 on
+everything it references.
 
 ## Introduction
 
