@@ -4,6 +4,7 @@ use crate::debugger;
 use crate::routing;
 use crate::sending;
 use crate::state::{Clock, Input, Panes, Session, Status, Transport};
+use swtos_frontend::debug::DebugMap;
 use swtos_frontend::protocol::Mode;
 use swtos_frontend::resource::Millis;
 use swtos_host::pump::Pump;
@@ -31,6 +32,7 @@ pub fn run(session: &mut Session, steps: u32, deadline: Millis, clock: &impl Clo
         for item in session.transport.decoder.push(&output) {
             routing::route(&mut session.panes, &mut session.console, now, item);
         }
+        debugger::prompt_if_due(&mut session.console, &mut session.panes.desktop, now);
         done += 1;
         if clock.elapsed() >= deadline {
             break;
@@ -39,9 +41,24 @@ pub fn run(session: &mut Session, steps: u32, deadline: Millis, clock: &impl Clo
     done.max(1)
 }
 
-/// Install the runtime-fetched debug map.
+/// Install the debug map fetched at runtime, enabling `sym`, `list`, `dis`.
+///
+/// Done here rather than behind a wrapper in `debugger`: the map arrives from
+/// the network, which is the session's business, and a second function on the
+/// way added nothing but a hop.
 pub fn load_map(session: &mut Session, json: &str) {
-    debugger::load_map(&mut session.console, &mut session.panes.desktop, json);
+    let note = match DebugMap::from_json(json) {
+        Ok(map) => {
+            let build = map.build_id.clone();
+            session.console.console.map = Some(map);
+            format!("debug map loaded: {build}\n")
+        }
+        Err(error) => format!("debug map: {error}\n"),
+    };
+    session
+        .panes
+        .desktop
+        .push_channel(debugger::CHANNEL, note.as_bytes());
 }
 
 /// Everything the status line reports.
@@ -70,6 +87,10 @@ pub fn session() -> Session {
         input: Input {
             prefix_armed: false,
         },
+        // The console is built here rather than in `debugger`, beside the
+        // rest of the session it belongs to. It starts with no debug map: at
+        // 1.8 MB the map is fetched at runtime rather than compiled in, so
+        // symbolic commands report its absence until it lands.
         console: crate::debugger::console(),
         tick: 0,
         greeted: false,

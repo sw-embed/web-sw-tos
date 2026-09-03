@@ -142,7 +142,7 @@ Every local change to a vendored file, so re-vendoring is mechanical rather
 than archaeological. Re-vendor by copying upstream fresh, then walking this
 table.
 
-Current vendoring: **sw-tos f9197df**.
+Current vendoring: **sw-tos 7a6227e**.
 
 The host-command prefix is `Ctrl-O`. Passages below written when it was
 `Ctrl-A` name it as it was, because they are describing when a decision was
@@ -173,6 +173,35 @@ filesystem, and no `Instant`. Every patch that existed because this project
 wanted different behaviour is gone.
 
 ### What this re-vendor taught
+
+Two upstream fixes closed things this project had been carrying as known
+issues, and both are worth reading rather than just taking.
+
+`df15e8e` is the kill that was accepted and never serviced. Releasing a slot
+cleared its state, program and statistics but not its preemption sidecar, and
+the sidecar holds runway eligibility -- which the kill path reads to decide how
+to kill. An eligible process is torn down by the interrupt handler's landing,
+so its kill is queued rather than done; a clock or an uptime never spins, so it
+is never the process the handler interrupts, so the queued kill was never
+serviced. A slot that had once held a cpu-hog poisoned whatever came next. The
+tell was `fp=56` reported against a program that had never been preempted.
+
+`d86eade` retires the pane-naming issue this project characterised in a test.
+The menu's programs now run in the shell itself rather than being spawned into
+a pane, so the case that test described -- a short-lived program reusing a
+channel and inheriting the previous program's name -- no longer arises from the
+menu at all. `bg` is what gives a program a pane now, and a background program
+is long-lived enough for a snapshot to catch. The test was replaced by one that
+checks `bg` gets a pane and answers `kill`, which is the half worth keeping.
+
+The debugger prompt moved from "after the command" to "after the reply". The
+target answers asynchronously and in as many frames as it likes, so a prompt
+printed straight after the command landed under the reply and left the next
+line typed with none. `Console` carries a deadline and `driver::run` fires it,
+which is the same shape as the footer clock: the loop that owns time owns the
+things that happen at a time.
+
+### What the f9197df re-vendor taught
 
 The prefix moved to `Ctrl-O`, and upstream's reason for the move is worth
 keeping: `Ctrl-A` is beginning-of-line to anyone with emacs fingers and the

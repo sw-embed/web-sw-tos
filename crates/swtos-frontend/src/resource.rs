@@ -3,7 +3,7 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/resource.rs
-//!   source commit: f9197df (committed tree)
+//!   source commit: 7a6227e (committed tree)
 //!   vendored:      2026-09-02
 //!
 //! Adapted: `Instant` replaced by `Millis` (an `f64`) supplied by the

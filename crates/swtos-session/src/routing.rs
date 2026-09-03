@@ -40,7 +40,7 @@ fn frame_arrived(panes: &mut Panes, console: &mut Console, now: Millis, frame: F
             panes::occupancy_changed(&mut panes.desktop, &frame);
         }
         FrameType::DebugResponse => {
-            debugger::response(console, &mut panes.desktop, &frame.payload);
+            debugger::response(console, &mut panes.desktop, &frame.payload, now);
         }
         FrameType::ResourceSnapshot => snapshot(panes, now, &frame.payload),
         FrameType::ChannelTitle => {

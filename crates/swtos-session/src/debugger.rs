@@ -7,7 +7,8 @@
 
 use crate::state::Console;
 use swtos_frontend::debug::DebugConsole;
-use swtos_frontend::debug::{DebugMap, identity_request};
+use swtos_frontend::debug::identity_request;
+use swtos_frontend::resource::Millis;
 use swtos_frontend::ui::Desktop;
 
 /// The Debugger pane's channel, from `PaneKind::Debugger::default_channel`.
@@ -19,6 +20,17 @@ pub const CHANNEL: u8 = 254;
 /// itself; what it needed was somewhere the typing visibly starts, so the pane
 /// reads as one that takes commands rather than one that only shows them.
 const PROMPT: &[u8] = b"dbg ";
+
+/// How long a reply must stay quiet before the prompt follows it.
+const PROMPT_AFTER: Millis = 150.0;
+
+/// Print the prompt a reply owes, once the frames have stopped arriving.
+pub fn prompt_if_due(console: &mut Console, desktop: &mut Desktop, now: Millis) {
+    if console.prompt_due.is_some_and(|due| now >= due) {
+        console.prompt_due = None;
+        desktop.push_channel(CHANNEL, PROMPT);
+    }
+}
 
 /// Greet, and ask the target to identify itself.
 pub fn greet(desktop: &mut Desktop) -> Vec<u8> {
@@ -49,7 +61,12 @@ pub fn key(console: &mut Console, desktop: &mut Desktop, key: &str) -> Option<Ve
         // to the shell and a line run here both leave the console ready.
         "Enter" => {
             let request = enter(console, desktop);
-            desktop.push_channel(CHANNEL, PROMPT);
+            // A command that asks the target something is owed its prompt by
+            // the reply, not by itself. One that answers locally prompts now.
+            if request.is_none() {
+                desktop.push_channel(CHANNEL, PROMPT);
+            }
+            console.prompt_due = None;
             request
         }
         "Backspace" => {
@@ -67,23 +84,14 @@ pub fn key(console: &mut Console, desktop: &mut Desktop, key: &str) -> Option<Ve
 }
 
 /// Feed a DEBUG_RESPONSE payload back into the pane.
-pub fn response(console: &mut Console, desktop: &mut Desktop, payload: &[u8]) {
+pub fn response(console: &mut Console, desktop: &mut Desktop, payload: &[u8], now: Millis) {
     console.awaiting = console.awaiting.saturating_sub(1);
     for line in console.console.response(payload) {
         desktop.push_channel(CHANNEL, format!("{line}\n").as_bytes());
     }
-}
-
-/// Install the debug map fetched at runtime, enabling `sym`, `list`, `dis`.
-pub fn load_map(console: &mut Console, desktop: &mut Desktop, json: &str) {
-    match DebugMap::from_json(json) {
-        Ok(map) => {
-            let build = map.build_id.clone();
-            console.console.map = Some(map);
-            desktop.push_channel(CHANNEL, format!("debug map loaded: {build}\n").as_bytes());
-        }
-        Err(error) => desktop.push_channel(CHANNEL, format!("debug map: {error}\n").as_bytes()),
-    }
+    // Push the prompt out past the frames still arriving rather than printing
+    // it between two of them.
+    console.prompt_due = Some(now + PROMPT_AFTER);
 }
 
 /// Run the line the user just finished typing.
@@ -115,7 +123,7 @@ fn enter(console: &mut Console, desktop: &mut Desktop) -> Option<Vec<u8>> {
     result.request
 }
 
-/// A console with no debug map: at 1.6 MB it is fetched at runtime rather
+/// A console with no debug map: at 1.8 MB it is fetched at runtime rather
 /// than compiled in, so symbolic commands report its absence until it lands.
 pub fn console() -> Console {
     Console {
@@ -123,5 +131,6 @@ pub fn console() -> Console {
         input: String::new(),
         awaiting: 0,
         pending: None,
+        prompt_due: None,
     }
 }

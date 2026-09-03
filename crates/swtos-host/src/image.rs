@@ -11,13 +11,13 @@ pub const PROGRAM: &[u8] = include_bytes!("../../../assets/program.bin");
 /// Identity of the image, taken from the debug map it was built alongside.
 /// The SWTOS debugger's identity opcode returns a CRC of the image's
 /// immutable range, and this is the value it must agree with.
-pub const BUILD_ID: &str = "crc24:a89715";
+pub const BUILD_ID: &str = "crc24:53999d";
 
 /// Byte length the debug map records for the image.
-pub const IMAGE_SIZE: usize = 28221;
+pub const IMAGE_SIZE: usize = 29038;
 
 /// SHA-256 the debug map records for the image.
-pub const IMAGE_SHA256: &str = "9128d0af2f4afd44e2bcb9f5b8e304eba2c9eaef95c519b96c3bcc947d8c202c";
+pub const IMAGE_SHA256: &str = "73f7582af361cb9495281ec17ab0440fa4b23f955872a469d922f7b78ef48f58";
 
 #[cfg(test)]
 mod tests {

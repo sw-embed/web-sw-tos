@@ -47,6 +47,13 @@ pub struct Console {
     pub awaiting: usize,
     /// A `!command` waiting to be handed to the shell.
     pub pending: Option<String>,
+    /// When to print the prompt that a reply owes.
+    ///
+    /// The target answers asynchronously and in as many frames as it likes --
+    /// registers arrive in two -- so a prompt printed straight after the
+    /// command lands under the reply, and the next line typed has none,
+    /// because the one owed to it was already spent.
+    pub prompt_due: Option<Millis>,
 }
 
 /// One live SWTOS session.

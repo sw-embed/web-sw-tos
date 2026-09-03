@@ -3,7 +3,7 @@
 //! VENDORED, DO NOT EDIT CASUALLY.
 //!   source repo:   sw-embed/sw-tos
 //!   source path:   tools/te-rs/src/disasm.rs
-//!   source commit: f9197df (committed tree)
+//!   source commit: 7a6227e (committed tree)
 //!   vendored:      2026-09-02
 //!
 //! Vendored unmodified.

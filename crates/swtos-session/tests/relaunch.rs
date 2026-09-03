@@ -1,14 +1,19 @@
 //! Launching, ending, and launching again.
 //!
-//! Reported: run a program from the menu, end it from its own pane with a
-//! keypress, return to the Shell, and the menu stops responding entirely.
+//! Reported: run a program from the menu, end it, return to the Shell, and the
+//! menu stops responding entirely.
+//!
+//! sw-tos d86eade since moved the menu's programs into the shell itself, so
+//! there is no second pane to end them from: one pane, and a key ends what is
+//! running in it. This drives the session's byte path directly, without the
+//! input crate on top.
 
 mod fake;
 
 use fake::FakeClock;
 use swtos_frontend::protocol::Mode;
+use swtos_session::driver;
 use swtos_session::state::Session;
-use swtos_session::{driver, routing};
 
 fn framed() -> Session {
     let mut session = driver::session();
@@ -49,43 +54,25 @@ fn the_menu_still_answers_after_a_program_ends() {
     let mut session = framed();
     let before = screen(&session);
     // The prompt is "# " since sw-tos 808256b: one level, everything runs
-    // here, which is what every other shell says. It used to ask "Choice:" as
-    // though a number were the only answer.
+    // here. It used to ask "Choice:" as though a number were the only answer.
     assert!(before.contains("MENU"), "no menu to begin with: {before}");
 
-    // Launch from the menu.
+    // Launch from the menu. It runs in the shell, and says how to leave.
     type_keys(&mut session, &["1", "\n"]);
     let launched = screen(&session);
     assert!(
-        launched.contains("Hello") || launched.contains("Press"),
+        launched.contains("Press a key here to exit"),
         "menu choice 1 launched nothing: {launched}"
     );
 
-    // End it: the app is waiting on a key.
-    //
-    // The most recently opened application pane, not the first. `mon` is an
-    // ordinary program now and owns an application pane of its own, so taking
-    // the first one sent the keystroke to the monitor -- which is blocked on a
-    // clock tick, swallowed it, and left hello waiting forever.
-    let app = session
-        .panes
-        .desktop
-        .layout()
-        .into_iter()
-        .rfind(|(kind, channel, _)| {
-            *channel != routing::SHELL && *kind == swtos_frontend::ui::PaneKind::Application
-        })
-        .map(|(_, channel, _)| channel);
-    if let Some(channel) = app {
-        swtos_session::sending::to_channel(&mut session, channel, b" ");
-        settle(&mut session);
-        settle(&mut session);
-    }
+    // End it where it runs. The shell is the only thing typing reaches.
+    let marker = screen(&session).matches("MENU").count();
+    type_keys(&mut session, &[" "]);
+    settle(&mut session);
 
-    // Back at the Shell, the menu must answer again. The evidence is the
+    // Back at the prompt, the menu must answer again. The evidence is the
     // second program's own output: "Counter" is no evidence at all, because
     // the menu banner says "2=Counter" whether or not anything ran.
-    let marker = screen(&session).matches("MENU").count();
     type_keys(&mut session, &["2", "\n"]);
     settle(&mut session);
     let after = screen(&session);
@@ -94,7 +81,7 @@ fn the_menu_still_answers_after_a_program_ends() {
         "the menu stopped answering after a program ended:\n{after}"
     );
     assert!(
-        after.contains("C1"),
+        after.contains("A1"),
         "the second program never ran:\n{after}"
     );
 }
