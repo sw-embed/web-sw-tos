@@ -1,5 +1,9 @@
 # SWTOS -- Live Terminal Demo
 
+<p align="center">
+  <img src="images/sw-tos-logo.webp" alt="SWTOS logo" width="200">
+</p>
+
 A preemptively multitasking microkernel running on an emulated 24-bit RISC
 CPU, driven from a tiled terminal frontend, entirely inside your browser.
 Rust compiled to WebAssembly, with no server and nothing to install.
