@@ -142,7 +142,7 @@ Every local change to a vendored file, so re-vendoring is mechanical rather
 than archaeological. Re-vendor by copying upstream fresh, then walking this
 table.
 
-Current vendoring: **sw-tos 99af617**.
+Current vendoring: **sw-tos 9a21190**.
 
 The host-command prefix is `Ctrl-O`. Passages below written when it was
 `Ctrl-A` name it as it was, because they are describing when a decision was
@@ -173,6 +173,20 @@ filesystem, and no `Instant`. Every patch that existed because this project
 wanted different behaviour is gone.
 
 ### What this re-vendor taught
+
+An image-only cycle, and the first one where this project's tests were the
+regression check rather than the thing being fixed. The shell now prints
+strings by name through macros instead of a character at a time: 951 bytes and
+537 instructions smaller, and nothing it does is meant to change.
+
+Every test here reads the rendered screen -- the menu banner, the prompt, a
+program's own output, what `kill` does, what a reboot reprints -- so a change to
+how those characters reach the UART had nowhere to hide. All ninety-nine passed
+against the new image with no edit. That is worth recording because it is the
+payoff for a rule followed all along: assert on what a person would see, not on
+the shape of the code that produced it.
+
+### What the 99af617 re-vendor taught
 
 `list` now shows source rather than a second disassembly, and it does that by
 reading the `.s` files sitting beside the map. Neither exists here: the map is
