@@ -14,20 +14,52 @@ use swtos_session::{debugger, sending};
 
 /// The host-command prefix, named once.
 ///
-/// Ctrl-O rather than Ctrl-A: Ctrl-A is beginning-of-line to anyone with emacs
-/// fingers, and the shell wants it once its line editing grows up. Ctrl-J was
-/// tried upstream and is a trap -- it is LF, so it arrives at the end of every
-/// pasted line and would swallow the Enter. Ctrl-O is neither a line ending
-/// nor flow control.
+/// `Ctrl-B`, which is tmux's own prefix, and **not** upstream's `Ctrl-O`. That
+/// divergence is forced by the browser, the same way `Instant` and `std::fs`
+/// are: on macOS the browser's shortcuts are Cmd-based so every Ctrl
+/// combination falls through to the page, but on Linux and Windows they are
+/// Ctrl-based and `Ctrl-O` is Open File -- taken by the browser before the
+/// page sees the keydown, where `preventDefault` cannot reach it. The whole
+/// command set was dead on those platforms (issue #1).
 ///
-/// In a browser Ctrl-O is the open-file dialog, so it must be stopped from
-/// reaching the page. That was already true of Ctrl-A, which is select-all.
-pub const PREFIX_KEY: &str = "o";
+/// What makes a prefix safe here is narrow. It must be a control byte, since
+/// the transport carries one byte; it must be neither CR nor LF, which arrive
+/// at the end of every pasted line; and no browser may claim it first.
+/// `Ctrl-B` is 0x02, is neither line ending, and is bound by no browser except
+/// Firefox's bookmarks sidebar, which a page may cancel. Tab, Enter and Escape
+/// are `Ctrl-I`, `Ctrl-M` and `Ctrl-[`, so those three are traps of the same
+/// kind and are not candidates.
+///
+/// A key can still be lost to a platform nobody tested, which is why the
+/// command menu exists: it needs no keyboard at all.
+pub const PREFIX_KEY: &str = "b";
 
 /// How to say it. The label the help overlay prints comes from here, so the
 /// screen cannot name a different key from the one that works -- which is
 /// exactly how upstream's two test harnesses drifted apart.
-pub const PREFIX_LABEL: &str = "Ctrl-O";
+pub const PREFIX_LABEL: &str = "Ctrl-B";
+
+/// The prefix commands worth offering to a mouse, as `(group, key, label)`.
+///
+/// Data, and the only list of its kind: the menu renders from here and clicks
+/// are replayed through [`key`], so a button cannot come to mean something
+/// different from the keystroke it names. Pane focus is absent on purpose --
+/// the numbers depend on which panes exist, so the menu builds those from the
+/// live layout instead of guessing here.
+pub const COMMANDS: [(&str, &str, &str); 12] = [
+    ("Panes", "n", "next"),
+    ("Panes", "p", "previous"),
+    ("Panes", "z", "zoom"),
+    ("Panes", "s", "split"),
+    ("Panes", "x", "close"),
+    ("Panes", "c", "close ended"),
+    ("View", "l", "clear pane"),
+    ("View", "S", "restore panes"),
+    ("View", "y", "copy mode"),
+    ("Session", "k", "restart shell"),
+    ("Session", "B", "warm reboot"),
+    ("Session", "?", "help"),
+];
 
 /// Keys the help overlay claims for itself, taken without the prefix because
 /// the overlay tells the reader to press exactly these.
@@ -100,6 +132,17 @@ fn command(session: &mut Session, key: &str) -> Vec<u8> {
     }
     session.panes.desktop.command(translate::command_byte(key));
     Vec::new()
+}
+
+/// Run a prefix command the way the menu asks for it: exactly as if the prefix
+/// key had been pressed and then this one.
+///
+/// Two calls through [`key`] rather than a reach into [`command`], so a click
+/// and a keystroke cannot diverge -- bare modifiers, the help overlay and copy
+/// mode all get their say in the same order either way.
+pub fn menu_command(session: &mut Session, key_name: &str) {
+    key(session, PREFIX_KEY, true);
+    key(session, key_name, false);
 }
 
 /// Give a local-console pane first refusal. The Debugger and Resources panes

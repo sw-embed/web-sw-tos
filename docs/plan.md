@@ -166,10 +166,14 @@ reason rather than assume drift.
 - `EmulatorCore::get_uart_output()` returns `&str`. The framed transport is
   binary, so the byte-exact path is `uart_log().entries()` filtered by
   `UartDirection::Output`, never the string accessor.
-- The prefix is `Ctrl-O` (sw-tos `f9197df` moved it off `Ctrl-A`, which is
-  beginning-of-line to emacs fingers and wanted by the shell's line editing).
-  In a browser it is the open-file dialog, so the key handler must intercept it
-  and `preventDefault`.
+- The prefix is `Ctrl-B`, tmux's own, and not upstream's `Ctrl-O` (sw-tos
+  `f9197df` moved off `Ctrl-A`, which is beginning-of-line to emacs fingers and
+  wanted by the shell's line editing). A browser competes for these keys and a
+  CLI does not: on macOS its shortcuts are Cmd-based so any Ctrl combination
+  reaches the page, but on Linux and Windows `Ctrl-O` is Open File, taken
+  before the page sees the keydown where `preventDefault` cannot reach it.
+  Because that can happen again on a platform nobody tested, the commands also
+  have a mouse route -- the command menu -- that needs no prefix key at all.
 - The emulator crate reaches `std::fs` in its SPI peripherals and
   `SystemTime::now()` in the I2C registry. SWTOS uses UART only here, but the
   wasm32 build must be verified early rather than assumed.

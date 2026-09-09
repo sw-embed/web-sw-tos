@@ -1,5 +1,6 @@
 mod browser;
 mod chrome;
+mod menu;
 
 use gloo::events::EventListener;
 use gloo::timers::callback::Timeout;
@@ -30,6 +31,9 @@ pub enum Msg {
     Resize,
     Key(String, bool),
     Geometry(usize),
+    MenuToggle,
+    /// A prefix command chosen with the mouse rather than the keyboard.
+    MenuCommand(String),
 }
 
 pub struct App {
@@ -38,6 +42,8 @@ pub struct App {
     /// Columns and rows measured from the window, for the `fit` geometry.
     fit: (usize, usize),
     fitted: bool,
+    /// Whether the command menu is showing.
+    menu: bool,
     last: f64,
     ms_per_tick: f64,
     /// The next tick, re-armed after each one completes.
@@ -81,6 +87,7 @@ impl Component for App {
             geometry: 0,
             fit: (80, 24),
             fitted: false,
+            menu: false,
             last: Date::now(),
             ms_per_tick: 0.0,
             next: Some(Timeout::new(0, move || link.send_message(Msg::Tick))),
@@ -91,33 +98,18 @@ impl Component for App {
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            Msg::Tick => {
-                // The stage does not exist until after the first render, so
-                // the initial measurement waits for the first tick.
-                if !self.fitted {
-                    self.fitted = true;
-                    self.fit = chrome::fit();
-                }
-                let started = Date::now();
-                let owed = (((started - self.last) / TICK_MS) as u32).clamp(1, MAX_CATCHUP);
-                let ran = swtos_session::driver::run(
-                    &mut self.session,
-                    owed,
-                    started + BUDGET_MS,
-                    &browser::BrowserClock,
-                );
-                self.ms_per_tick = (Date::now() - started) / f64::from(ran);
-                self.last = started;
-                // Aim for the 100 Hz cadence, but never schedule zero delay:
-                // the browser has to get a turn between ticks.
-                let delay = (TICK_MS - (Date::now() - started)).max(1.0) as u32;
-                let link = ctx.link().clone();
-                self.next = Some(Timeout::new(delay, move || link.send_message(Msg::Tick)));
-            }
+            Msg::Tick => self.tick(ctx),
             Msg::Key(key, ctrl) => {
                 swtos_input::dispatch::key(&mut self.session, &key, ctrl);
             }
             Msg::Geometry(index) => self.geometry = index.min(chrome::GEOMETRIES.len() - 1),
+            Msg::MenuToggle => self.menu = !self.menu,
+            Msg::MenuCommand(key) => {
+                swtos_input::dispatch::menu_command(&mut self.session, &key);
+                // Close on use. The menu covers the screen it acts on, and
+                // every command here changes what is worth looking at.
+                self.menu = false;
+            }
             Msg::Resize => self.fit = chrome::fit(),
             Msg::MapLoaded(json) => swtos_session::driver::load_map(&mut self.session, &json),
         }
@@ -135,6 +127,7 @@ impl Component for App {
         html! {
             <>
                 { chrome::header(self.geometry, on_geometry) }
+                { menu::view(&self.session.panes.desktop, self.menu, ctx.link()) }
                 <div class="stage">
                     <pre class="terminal" style={format!("--cols: {cols}; --rows: {rows};")}>
                         { self.screen(cols, rows) }
@@ -148,6 +141,31 @@ impl Component for App {
 }
 
 impl App {
+    /// Advance the emulator and schedule the next turn.
+    fn tick(&mut self, ctx: &Context<Self>) {
+        // The stage does not exist until after the first render, so the
+        // initial measurement waits for the first tick.
+        if !self.fitted {
+            self.fitted = true;
+            self.fit = chrome::fit();
+        }
+        let started = Date::now();
+        let owed = (((started - self.last) / TICK_MS) as u32).clamp(1, MAX_CATCHUP);
+        let ran = swtos_session::driver::run(
+            &mut self.session,
+            owed,
+            started + BUDGET_MS,
+            &browser::BrowserClock,
+        );
+        self.ms_per_tick = (Date::now() - started) / f64::from(ran);
+        self.last = started;
+        // Aim for the 100 Hz cadence, but never schedule zero delay: the
+        // browser has to get a turn between ticks.
+        let delay = (TICK_MS - (Date::now() - started)).max(1.0) as u32;
+        let link = ctx.link().clone();
+        self.next = Some(Timeout::new(delay, move || link.send_message(Msg::Tick)));
+    }
+
     /// Flatten the pane grid into text for the `<pre>`. Cells carry colour and
     /// attributes that nothing sets yet; when they do, this is the one place
     /// that has to start emitting spans.

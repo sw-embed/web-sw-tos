@@ -35,10 +35,18 @@ fn printable_and_ctrl_letters_map_as_a_terminal_would() {
     assert_eq!(translate::to_bytes("1", false), b"1");
     assert_eq!(translate::to_bytes("a", true), vec![0x01]);
     assert_eq!(translate::to_bytes("A", true), vec![0x01]);
-    // Translation and interception are separate jobs. Ctrl-O has a byte like
-    // any other control letter; what stops it reaching the target is dispatch
-    // arming the prefix, not translate refusing to encode it.
-    assert_eq!(translate::to_bytes(dispatch::PREFIX_KEY, true), vec![0x0f]);
+    // Translation and interception are separate jobs. The prefix has a byte
+    // like any other control letter; what stops it reaching the target is
+    // dispatch arming the prefix, not translate refusing to encode it.
+    //
+    // Derived rather than written out: spelling the byte here pinned the test
+    // to one prefix, so moving off Ctrl-O for issue #1 broke an assertion that
+    // was never about which key it is.
+    let letter = dispatch::PREFIX_KEY.as_bytes()[0].to_ascii_uppercase();
+    assert_eq!(
+        translate::to_bytes(dispatch::PREFIX_KEY, true),
+        vec![letter & 0x1f]
+    );
     assert_eq!(translate::to_bytes("z", true), vec![0x1a]);
     for named in ["Shift", "ArrowUp", "F5", "CapsLock"] {
         assert!(

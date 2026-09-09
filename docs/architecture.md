@@ -155,6 +155,16 @@ made; the binding they describe is unchanged, only the key that reaches it.
 | `ui.rs` | required | Adds `Cell`, `Color`, `Attrs`, and a `render_grid` **adapter** over upstream's `render`. |
 | all five | trace | Provenance header naming source repo, path, commit, and date. |
 
+The prefix key is a **third** platform divergence, alongside no filesystem and
+no `Instant`, and it is not in the table because it is not a patch to a
+vendored file: `dispatch::PREFIX_KEY` is this project's own. Upstream uses
+`Ctrl-O`; here it is `Ctrl-B`. On macOS the browser's shortcuts are Cmd-based
+so any Ctrl combination reaches the page, but on Linux and Windows they are
+Ctrl-based and `Ctrl-O` is Open File -- taken before the page sees the keydown,
+where `preventDefault` cannot reach it. Every binding was dead there (issue
+\#1). A CLI has no such competitor for the key, which is why upstream is free
+to choose differently.
+
 A **tracking** patch is one that exists upstream but is not committed yet.
 Vendoring from `git show HEAD:...` is right -- provenance must name a commit
 that actually contains the content -- but it means uncommitted upstream work is
@@ -171,6 +181,28 @@ image bytes, so `dis` no longer depends on the debug map being loaded.
 Only two kinds of patch are left, and both are forced by the platform: no
 filesystem, and no `Instant`. Every patch that existed because this project
 wanted different behaviour is gone.
+
+### What the command menu is for
+
+A prefix key can be taken away by the browser, and no amount of care in
+choosing one removes that risk -- it only moves it to a platform nobody
+tested. So the commands also have a route that needs no keyboard: a button in
+the page chrome opens a menu, and each entry replays through
+`dispatch::menu_command`, which presses the prefix and then the key.
+
+Two calls into `dispatch::key`, rather than a reach into the command table, is
+the whole design. Bare modifiers, the help overlay and copy mode all get their
+say in the same order whichever way a command arrives, so a button cannot come
+to mean something different from the keystroke printed on it. The test compares
+the rendered screen after a click against the screen after the keystroke.
+
+The pane-focus buttons are built from the live layout rather than a fixed 1-9.
+The numbers mean nothing without the panes behind them, and a menu offering
+nine when four are open is a menu that lies five times.
+
+This is also where the "no mouse" rule earns its precise wording. It is about
+the character screen, which still takes no clicks. Page chrome has always been
+allowed a mouse -- the geometry selector is one -- and the menu is chrome.
 
 ### What this re-vendor taught
 

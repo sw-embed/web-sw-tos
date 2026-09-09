@@ -295,14 +295,24 @@ becomes two in-process byte queues. Preemption stays host-driven: a five-byte
   uses `render_grid()` and paints cells directly.
 - **`render_grid()` returns cells, not `char`.** See the ANSI-color section of
   `docs/plan.md`; this is the one decision that keeps color additive.
-- **The prefix key must `preventDefault`.** It is `Ctrl-O` since sw-tos
-  `f9197df` (was `Ctrl-A`), and in a browser that is the open-file dialog, so
-  it still has to be stopped from reaching the page. Name it from
+- **The prefix key must `preventDefault`, and must be one the browser will
+  give up.** It is `Ctrl-B` here -- tmux's own prefix -- and deliberately not
+  upstream's `Ctrl-O`. On macOS browser shortcuts are Cmd-based so any Ctrl
+  combination reaches the page; on Linux and Windows they are Ctrl-based, and
+  `Ctrl-O` is Open File, taken before the page sees the keydown where
+  `preventDefault` cannot reach it. That killed every binding on those
+  platforms (issue #1). A candidate must also be a control byte, and neither
+  CR nor LF (they arrive on every pasted line) nor Tab/Enter/Escape (which
+  *are* `Ctrl-I`/`Ctrl-M`/`Ctrl-[`). Name it from
   `swtos_input::dispatch::PREFIX_KEY` / `PREFIX_LABEL` rather than spelling it
-  out: the screen must never advertise a key that differs from the one that
-  arms.
-- **No mouse, no scrollbars, no copy/paste.** Layout, focus, zoom, and
-  scrolling are prefix commands only, exactly as in the CLI.
+  out -- including in tests, where a hardcoded byte pinned an assertion to a
+  key it was never about.
+- **No mouse on the character screen.** Layout, focus, zoom and scrolling are
+  prefix commands, exactly as in the CLI, and the grid itself takes no clicks,
+  no scrollbars, no copy/paste. *Page chrome is not the character screen*: the
+  geometry selector and the command menu are ordinary controls, and the menu
+  is why a browser stealing the prefix key can no longer take the frontend
+  with it. A mouse route to the commands is a fallback, never the only way.
 - Verify the `wasm32-unknown-unknown` build early. The emulator crate reaches
   `std::fs` in its SPI peripherals and `SystemTime::now()` in the I2C registry;
   `resource.rs` uses `Instant`, which panics on that target.

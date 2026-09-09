@@ -56,8 +56,9 @@ becomes an in-process virtual UART, and everything else keeps its shape --
 the same framed transport, the same pane model, and the same host-driven
 scheduler heartbeat that makes preemption work. The result is a simulated
 CLI in a web page: one fixed-size character grid that the frontend divides
-into panes, driven entirely by `Ctrl-O` commands exactly as on a real
-terminal.
+into panes, driven entirely by `Ctrl-B` commands exactly as on a real
+terminal, or from a command menu for anyone whose browser has other ideas
+about the prefix key.
 
 There is deliberately no mouse support, no scrollbars, and no copy/paste.
 The demo reproduces a terminal, so layout, focus, zoom, and scrolling belong
@@ -116,8 +117,10 @@ At the `Choice:` prompt, press a digit:
 | `5` | Multitask -- two processes interleaving |
 | `6` | UART test |
 
-Once the tiled frontend lands, the frontend prefix is `Ctrl-O`. Release it
-before typing the command; each command needs its own prefix.
+The frontend prefix is `Ctrl-B`, as in tmux. Release it before typing the
+command; each command needs its own prefix. If your browser claims the key --
+Chrome on Linux takes `Ctrl-O`, which is why this is no longer `Ctrl-O` -- the
+**commands** button above the screen offers the same commands to a mouse.
 
 | Prefix command | Action |
 |---|---|

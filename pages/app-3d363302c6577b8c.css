@@ -102,3 +102,76 @@ footer a:hover { text-decoration: underline; }
     white-space: pre;
     overflow-x: auto;
 }
+
+/* Command menu: page chrome, like the geometry selector. The character screen
+   still takes no mouse input; this is the way to the prefix commands when the
+   browser has taken the prefix key, which Chrome on Linux does with Ctrl-O. */
+.menu {
+    position: relative;
+    padding: 0 20px;
+    background: var(--mantle);
+    border-bottom: 1px solid var(--surface1);
+    flex-shrink: 0;
+}
+
+.menu-button {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    color: var(--subtext1);
+    background: var(--surface0);
+    border: 1px solid var(--surface1);
+    border-radius: 4px;
+    padding: 3px 10px;
+    margin: 6px 0;
+    cursor: pointer;
+}
+
+.menu-button:hover { border-color: var(--blue); color: var(--text); }
+
+.menu-panel {
+    position: absolute;
+    top: 100%;
+    left: 20px;
+    z-index: 10;
+    background: var(--base);
+    border: 1px solid var(--surface1);
+    border-radius: 6px;
+    padding: 10px 12px;
+    box-shadow: 0 6px 18px rgb(0 0 0 / 45%);
+}
+
+.menu-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 6px;
+}
+
+.menu-label {
+    font-size: 0.75em;
+    color: var(--overlay1);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    min-width: 56px;
+}
+
+.menu-group button {
+    font-family: var(--mono);
+    font-size: 0.8em;
+    color: var(--subtext1);
+    background: var(--surface0);
+    border: 1px solid var(--surface1);
+    border-radius: 4px;
+    padding: 3px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.menu-group button:hover { border-color: var(--blue); color: var(--text); }
+
+.menu-note {
+    font-size: 0.75em;
+    color: var(--overlay1);
+    margin-top: 2px;
+}
