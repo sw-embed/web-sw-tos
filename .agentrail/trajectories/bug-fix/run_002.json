@@ -1,0 +1,11 @@
+{
+  "task_type": "bug-fix",
+  "state": {
+    "number": 19,
+    "step": "fix-prefix-key-and-command-menu"
+  },
+  "action": "agentrail insert/begin; edited dispatch.rs, new src/menu.rs, lib.rs, app.css; new tests/menu.rs (5 tests); scripts/gate.sh; build-pages.sh; git commit and push",
+  "result": "success",
+  "reward": 1,
+  "timestamp": "2026-09-09T11:23:17"
+}

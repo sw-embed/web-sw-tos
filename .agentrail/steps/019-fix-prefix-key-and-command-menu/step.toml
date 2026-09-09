@@ -1,9 +1,10 @@
 number = 19
 slug = "fix-prefix-key-and-command-menu"
-status = "in-progress"
+status = "completed"
 description = "Fix GitHub issue #1: the Ctrl-O prefix works in a browser on macOS but not on..."
 role = "production"
 context_files = []
 created_at = "2026-09-09T09:30:49"
+completed_at = "2026-09-09T11:23:17"
 task_type = "bug-fix"
-commits = []
+commits = ["8ab57144c9b13f0c2e616b4c06d5631e95105c54"]
