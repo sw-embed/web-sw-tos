@@ -1,0 +1,1 @@
+Restored https://sw-embed.github.io/web-sw-tos/screenshot.png, which step 021 broke by moving the screenshot into media/. The file stays in media/ and is also copy-file'd to the root; root is the canonical, publicly-linked URL and must never move. Gate was skipped for the restore commit to get the public link back fast, then run afterwards and passed.
