@@ -1,0 +1,1 @@
+Statically serve the sw-tos demo media (two .webm videos, the terminal .webp) from the Pages site via a Trunk copy-dir media/ alongside the screenshot, because GitHub blob/raw links to them fail. Then point the sw-tos README media links at the served URLs.

@@ -16,7 +16,7 @@ push to `main`, so it may be mid-thought.
 Blog post: **[Made Visible: SWTOS](https://blog.softwarewrighter.com/2026/09/11/made-visible-swtos/)** -- visualizing this OS.
 
 <p align="center">
-  <a href="https://sw-embed.github.io/web-sw-tos/screenshot.png">
+  <a href="https://sw-embed.github.io/web-sw-tos/media/screenshot.png">
     <img src="images/screenshot-thumb.png" alt="SWTOS running in the browser: shell, resource monitor and debugger panes" width="800">
   </a>
   <br>
@@ -226,6 +226,7 @@ crates/         swtos-frontend (vendored te-rs core), swtos-host (emulator side)
 assets/         vendored SWTOS image and debug map
 docs/           design documents
 images/         README assets
+media/          statically served demo assets: the screenshot and the sw-tos demo videos
 pages/          committed GitHub Pages output
 scripts/        serve.sh, build-pages.sh
 ```
