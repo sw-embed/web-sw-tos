@@ -1,4 +1,4 @@
-number = 22
+number = 23
 slug = "application-panes"
 status = "pending"
 description = "Channel open/close/title and run NAME --tty=new."

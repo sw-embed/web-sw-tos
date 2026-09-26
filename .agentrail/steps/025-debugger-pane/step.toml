@@ -1,4 +1,4 @@
-number = 24
+number = 25
 slug = "debugger-pane"
 status = "pending"
 description = "DebugConsole identity, regs, and kill opcodes."

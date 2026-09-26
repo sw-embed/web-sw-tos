@@ -1,0 +1,1 @@
+Restore https://sw-embed.github.io/web-sw-tos/screenshot.png, a public link broken when the screenshot moved into media/. Serve it at the root again via copy-file and make the root URL the canonical README link.

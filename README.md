@@ -16,7 +16,7 @@ push to `main`, so it may be mid-thought.
 Blog post: **[Made Visible: SWTOS](https://blog.softwarewrighter.com/2026/09/11/made-visible-swtos/)** -- visualizing this OS.
 
 <p align="center">
-  <a href="https://sw-embed.github.io/web-sw-tos/media/screenshot.png">
+  <a href="https://sw-embed.github.io/web-sw-tos/screenshot.png">
     <img src="images/screenshot-thumb.png" alt="SWTOS running in the browser: shell, resource monitor and debugger panes" width="800">
   </a>
   <br>
@@ -217,6 +217,10 @@ The Pages workflow deploys the **committed** `pages/` directory rather than
 building in CI, so the WebAssembly bundle is built locally and checked in.
 Run `./scripts/build-pages.sh` and stage `pages/` whenever web source
 changes.
+
+**Do not move, rename or delete** `https://sw-embed.github.io/web-sw-tos/screenshot.png`.
+It is linked from a public forum post, so that URL is a commitment: replace
+the file in place to update it.
 
 ### Project layout
 
