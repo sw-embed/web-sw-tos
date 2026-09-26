@@ -1,0 +1,1 @@
+media/ is a Trunk copy-dir served at https://sw-embed.github.io/web-sw-tos/media/: screenshot.png (moved from root) plus the vendored sw-tos demo videos cor24-windows-demo.webm, cor24-preemption-demo.webm and cor24-terminal-demo.webp. README thumbnail link updated. The sw-tos README is repointed at these URLs in a separate sw-tos commit.

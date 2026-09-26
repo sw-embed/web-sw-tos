@@ -1,9 +1,10 @@
 number = 21
 slug = "serve-demo-media"
-status = "in-progress"
+status = "completed"
 description = "Statically serve the sw-tos demo media (two .webm videos, the terminal .webp)..."
 role = "production"
 context_files = []
 created_at = "2026-09-26T14:15:11"
+completed_at = "2026-09-26T14:23:40"
 task_type = "docs"
-commits = []
+commits = ["24fa9e9b9b503dc3d1d1eb79a3ff605595ea222d"]
