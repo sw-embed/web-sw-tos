@@ -15,7 +15,13 @@ push to `main`, so it may be mid-thought.
 
 Blog post: **[Made Visible: SWTOS](https://blog.softwarewrighter.com/2026/09/11/made-visible-swtos/)** -- visualizing this OS.
 
-![SWTOS running in the browser](images/screenshot.png?ts=1787946868000)
+<p align="center">
+  <a href="https://sw-embed.github.io/web-sw-tos/screenshot.png">
+    <img src="images/screenshot-thumb.png" alt="SWTOS running in the browser: shell, resource monitor and debugger panes" width="800">
+  </a>
+  <br>
+  <sub>Click for the full-size capture, served from the nightly demo.</sub>
+</p>
 
 Part of the [Software Wrighter COR24 Tools Project](https://sw-embed.github.io/web-sw-cor24-demos/#/).
 
@@ -82,8 +88,8 @@ a simulation of one, is the point of this demo.
 
 **The shell is live and interactive.** SWTOS boots on the emulated CPU, prints
 its menu, and responds to your keystrokes. Press `1` for Hello, `2` for
-Counter, `5` for the multitasking demo -- the screenshot above shows two
-processes interleaving their output (`B1`, `C1`, `B2`, `C2`).
+Counter, `5` for the multitasking demo. The screenshot above shows the shell,
+the resource monitor, and the debugger, each in its own pane.
 
 The tiled pane frontend is still being ported.
 

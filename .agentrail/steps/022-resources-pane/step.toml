@@ -1,4 +1,4 @@
-number = 21
+number = 22
 slug = "resources-pane"
 status = "pending"
 description = "SnapshotAssembler with generation discipline, fp= and cpu= display."

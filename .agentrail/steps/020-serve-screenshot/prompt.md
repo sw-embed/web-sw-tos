@@ -1,0 +1,1 @@
+Serve the full-size screen capture (~/Downloads/sw-tos-screencapture.png) from the live Pages site via the Trunk pipeline, and replace the README screenshot with a thumbnail that links to the served full-size image. Also commit the refreshed agentrail briefing (CLAUDE.md/AGENTS.md).
