@@ -52,7 +52,7 @@ everything it references.
 small CPUs, inspired by MINIX IPC principles. It runs on the MakerLisp COR24
 soft CPU -- a 24-bit RISC core for Lattice FPGAs -- and provides synchronous
 message-passing IPC, a resident program catalog, and preemptive scheduling
-without an MMU, without hardware multiply, and without floating point.
+without an MMU, without hardware divide, and without floating point.
 
 Its command-line demo is three programs joined by a pty: a host process
 running the COR24 emulator, the pty itself, and `te-rs`, a tiled terminal
