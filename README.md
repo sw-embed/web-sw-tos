@@ -13,6 +13,8 @@ Rust compiled to WebAssembly, with no server and nothing to install.
 **[Nightly demo](https://sw-embed.github.io/web-sw-tos/)** -- rebuilt on every
 push to `main`, so it may be mid-thought.
 
+Blog post: **[Made Visible: SWTOS](https://blog.softwarewrighter.com/2026/09/11/made-visible-swtos/)** -- visualizing this OS.
+
 ![SWTOS running in the browser](images/screenshot.png?ts=1787946868000)
 
 Part of the [Software Wrighter COR24 Tools Project](https://sw-embed.github.io/web-sw-cor24-demos/#/).
